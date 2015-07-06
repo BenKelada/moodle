@@ -843,4 +843,253 @@ class assign_files implements renderable {
             $file->fileurl = html_writer::link($url, $filename);
         }
     }
+
+}
+/**
+ * Renderable assignment student summary page
+ * @package   mod_assign
+ * @copyright 2015 Ben Kelada (ben.kelada@gmail.com)
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class assign_submission_page implements renderable, templatable {
+    public $assignviewobj;
+    public $studentsummaryonly;
+
+    public function __construct(\mod_assign_view_object $assignviewobj, $studentsummaryonly = false) {
+        $this->assignviewobj = $assignviewobj;
+        $this->studentsummaryonly = $studentsummaryonly;
+    }
+
+    public function export_for_template(\renderer_base $output) {
+
+        $viewobj = $this->assignviewobj;
+        $data = new \stdClass();
+
+        if (!$this->studentsummaryonly) {
+            $postfix = '';
+            if ($viewobj->has_visible_attachments) {
+                $postfix = $viewobj->area_files_rendered;
+            }
+            $header = new assign_header($viewobj->instance,
+                $viewobj->context,
+                $viewobj->show_intro,
+                $viewobj->course_module_id,
+                '', '', $postfix);
+
+            $data->renderables['header'] = $header;
+
+            $data->plugin_headers = '';
+            $plugins = array_merge($viewobj->submission_plugins, $viewobj->feedback_plugins);
+            foreach ($plugins as $plugin) {
+                if ($plugin->is_enabled() && $plugin->is_visible()) {
+                    $data->renderables[$plugin->get_type()] = new assign_plugin_header($plugin);
+                }
+            }
+
+            if ($viewobj->can_view_grades) {
+
+                $data->group_selector_activity_menu = groups_print_activity_menu($viewobj->course_module,
+                                                                                 $viewobj->current_url->out(), true);
+
+                $gradingsummary = new assign_grading_summary($viewobj->participant_count,
+                    $viewobj->submission_drafts_enabled,
+                    $viewobj->submission_drafts_count,
+                    $viewobj->is_any_submission_plugin_enabled,
+                    $viewobj->submissions_submitted_count,
+                    $viewobj->cutoffdate,
+                    $viewobj->duedate,
+                    $viewobj->course_module_id,
+                    $viewobj->count_submissions_need_grading,
+                    $viewobj->is_team_submission,
+                    $viewobj->warn_of_ungrouped_users);
+
+                $data->renderables['grading_summary'] = $gradingsummary;
+            }
+        }
+        if ($viewobj->can_view_submission) {
+            $submissionstatus = new assign_submission_status($viewobj->instance->allowsubmissionsfromdate,
+                $viewobj->instance->alwaysshowdescription,
+                $viewobj->submission,
+                $viewobj->is_team_submission,
+                $viewobj->group_submission,
+                $viewobj->submission_group,
+                $viewobj->group_members_not_submitted,
+                $viewobj->is_any_submission_plugin_enabled,
+                $viewobj->grade_locked,
+                $viewobj->is_graded,
+                $viewobj->instance->duedate,
+                $viewobj->instance->cutoffdate,
+                $viewobj->submission_plugins,
+                $viewobj->return_action,
+                $viewobj->return_params,
+                $viewobj->course_module_id,
+                $viewobj->course_id,
+                $viewobj->view_type,
+                $viewobj->show_edit_button,
+                $viewobj->show_submit_button,
+                $viewobj->view_full_names,
+                $viewobj->extension_due_date,
+                $viewobj->context,
+                $viewobj->is_blind_marking,
+                $viewobj->grading_controller_preview,
+                $viewobj->instance->attemptreopenmethod,
+                $viewobj->instance->maxattempts,
+                $viewobj->grading_status,
+                $viewobj->instance->preventsubmissionnotingroup);
+
+            $data->renderables['submission_status'] = $submissionstatus;
+            if ($viewobj->visible_grade) {
+                $feedbackstatus = new assign_feedback_status($viewobj->grade_for_display,
+                    $viewobj->graded_date,
+                    $viewobj->grader,
+                    $viewobj->feedback_plugins,
+                    $viewobj->grade,
+                    $viewobj->course_module_id,
+                    $viewobj->return_action,
+                    $viewobj->return_params);
+
+                $data->renderables['feedback_status'] = $feedbackstatus;
+
+                if (count($viewobj->all_submissions > 1)) {
+                    $history = new assign_attempt_history($viewobj->all_submissions,
+                        $viewobj->all_grades,
+                        $viewobj->submission_plugins,
+                        $viewobj->feedback_plugins,
+                        $viewobj->course_module_id,
+                        $viewobj->return_action,
+                        $viewobj->return_params,
+                        false,
+                        0,
+                        0);
+
+                    $data->renderables['history'] = $history;
+                }
+            }
+        }
+
+        return $data;
+    }
+}
+
+/**
+ * Class that holds view information to build assignment page
+ *
+ */
+class mod_assign_view_object {
+    /** @var core_user $user Contains user object, this is the user whose assignment we are viewing. */
+    public $user;
+    /** @var stdClass $instance The assignment instance we are viewing. */
+    public $instance;
+    /** @var bool $show_links Should we show submit/edit links, not shown on report/user page. */
+    public $show_links;
+    /** @var bool Are there any intro attachments to display? */
+    public $has_visible_attachments;
+    /** @var assign_files Renderered files for this mod_assign intro area */
+    public $area_files_rendered;
+    /** @var  context $context Context module */
+    public $context;
+    /** @var  bool $show_intro Assignment configuration show assignment intro text? */
+    public $show_intro;
+    /** @var  stdClass $course_module Course module. */
+    public $course_module;
+    /** @var  int $course_module_id Course module id. */
+    public $course_module_id;
+    /** @var  int $course_id Course id. */
+    public $course_id;
+    /** @var  array $feedback_plugins List of feedback plugins installed. */
+    public $feedback_plugins;
+    /** @var  array $submission_plugins List of submisison plugins installed */
+    public $submission_plugins;
+    /** @var  bool $can_view_grades Can user view grades? */
+    public $can_view_grades;
+    /** @var  bool $can_view_submission Can user view this submission? */
+    public $can_view_submission;
+    /** @var  bool $is_team_submission Is this assignment a group/team submisison? */
+    public $is_team_submission;
+    /** @var  stdClass $group_submission The groups submission */
+    public $group_submission;
+    /** @var  mixed $submission_group The group of the user or false */
+    public $submission_group;
+    /** @var  array $group_members_not_submitted List of group members who have not submitted */
+    public $group_members_not_submitted;
+    /** @var  bool $is_any_submission_plugin_enabled Check of all submission plugins true if any are enabled */
+    public $is_any_submission_plugin_enabled;
+    /** @var  stdClass $grade Grade record for this users assignment */
+    public $grade;
+    /** @var  stdClass $submission submission of the user */
+    public $submission;
+    /** @var  int $groupid id of users group */
+    public $groupid;
+    /** @var  bool $warn_of_ungrouped_users Warn that submission is restricted to groups and user is not in a group */
+    public $warn_of_ungrouped_users;
+    /** @var  int $participant_count Count of groups or users */
+    public $participant_count;
+    /** @var bool $submission_drafts_enabled INSTANCE: Are submission drafts enabled for this instance */
+    public $submission_drafts_enabled;
+    /** @var  int $submission_drafts_count ?? How many drafts have been submitted */
+    public $submission_drafts_count;
+    /** @var  int $submissions_submitted_count How many submissions have been submitted */
+    public $submissions_submitted_count;
+    /** @var  core_date $cutoffdate INSTANCE: cut off date for this assignment instance */
+    public $cutoffdate;
+    /** @var  core_date $duedate INSTANCE: due date for this assignment instance */
+    public $duedate;
+    /** @var  int $count_submissions_need_grading INSTANCE: number of submissions in the current instance that need grading */
+    public $count_submissions_need_grading;
+    /** @var  stdClass $flags user flags object */
+    public $flags;
+    /** @var  bool $can_edit_submission Can this grader edit this submission do they have the capability? */
+    public $can_edit_submission;
+    /** @var  bool $grading_disabled Can this users grade be edited? */
+    public $grading_disabled;
+    /** @var  bool $submissions_open Open for submissions? check of duedate, late, already submitted, locked */
+    public $submissions_open;
+    /** @var  bool $show_edit_button Should we show the edit button? */
+    public $show_edit_button;
+    /** @var  bool $show_submit_button Should we show the submit button? */
+    public $show_submit_button;
+    /** @var  bool $grade_locked Is user flagged as locked or grading disabled? */
+    public $grade_locked;
+    /** @var  mixed $extension_due_date does user have an extension due date or null */
+    public $extension_due_date;
+    /** @var  bool $view_full_names does user have capability to view full names for this course context */
+    public $view_full_names;
+    /** @var  string $grading_status Grading status */
+    public $grading_status;
+    /** @var  bool $user_has_submit_capability Does the user have the submit capability */
+    public $user_has_submit_capability;
+    /** @var  bool $is_graded has this assignment been graded? */
+    public $is_graded;
+    /** @var  string $return_action action to get back to current page */
+    public $return_action;
+    /** @var  string $return_params params for return action */
+    public $return_params;
+    /** @var int $view_type hardcoded to submission_status::student_view currently */
+    public $view_type;
+    /** @var  bool $visible_grade is grade visible */
+    public $visible_grade;
+    /** @var  bool $is_blind_marking is blind marking enabled */
+    public $is_blind_marking;
+    /** @var  string $grading_controller_preview rendered preview of grading controller. */
+    public $grading_controller_preview;
+    /** @var  array $grading_info various  grading information */
+    public $grading_info;
+    /** @var  grade_item $grading_item Grading item */
+    public $grading_item;
+    /** @var  grade $grade_book_grade gradebook grade */
+    public $grade_book_grade;
+    /** @var  bool $can_grade Does user have grade capability */
+    public $can_grade;
+    /** @var  string $grade_for_display Grade for display */
+    public $grade_for_display;
+    /** @var  string $graded_date Date item was graded */
+    public $graded_date;
+    /** @var  stdClass $grader user object of person grading (grader) */
+    public $grader;
+    /** @var  moodle_url $current_url current url */
+    public $current_url;
+    /** @var  array $all_submissions All the submissions from this user for this assignment */
+    public $all_submissions;
+    /** @var  array $all_grades All the grades from submissions for this user for this assignment */
+    public $all_grades;
 }

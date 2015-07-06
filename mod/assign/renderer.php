@@ -1240,5 +1240,15 @@ class mod_assign_renderer extends plugin_renderer_base {
         return $o;
     }
 
+    public function render_assign_submission_page($page) {
+        $data = $page->export_for_template($this);
+        foreach ($data->renderables as $name => $renderable) {
+            $data->$name = $this->render($renderable);
+        }
+
+        return $this->render_from_template('mod_assign/submission_page', $data);
+    }
+
 }
+
 

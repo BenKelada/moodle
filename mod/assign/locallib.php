@@ -388,7 +388,7 @@ class assign {
      * @return string - The page output.
      */
     public function view($action='') {
-
+        global $USER;
         $o = '';
         $mform = null;
         $notices = array();
@@ -553,12 +553,189 @@ class assign {
         } else if ($action == 'viewsubmitforgradingerror') {
             $o .= $this->view_error_page(get_string('submitforgrading', 'assign'), $notices);
         } else {
-            $o .= $this->view_submission_page();
+            $assignviewobj = $this->build_view_object($USER);
+            $viewsubmissionpage = new assign_submission_page($assignviewobj);
+            $o .= $this->get_renderer()->render($viewsubmissionpage);
+
+            \mod_assign\event\submission_status_viewed::create_from_assign($this)->trigger();
+
+            $o .= $this->view_footer();
         }
 
         return $o;
     }
 
+    /**
+     * Builds the data needed for the assignment view page
+     * @param core_user $user
+     * @param bool|true $showlinks show the submit/edit button, not shown on user report page
+     *
+     * @return mod_assign_view_object
+     * @throws coding_exception
+     * @throws moodle_exception
+     */
+    public function build_view_object($user, $showlinks = true) {
+        global $CFG, $DB, $PAGE; // Both globals for grade/feedback.
+
+        $assignviewobj = new mod_assign_view_object();
+        $assignviewobj->user = $user;
+        $assignviewobj->instance = $this->get_instance();
+        $assignviewobj->show_links = $showlinks;
+        $assignviewobj->has_visible_attachments = $this->has_visible_attachments();
+        if ($assignviewobj->has_visible_attachments) {
+            $assignviewobj->area_files_rendered = $this->render_area_files('mod_assign', ASSIGN_INTROATTACHMENT_FILEAREA, 0);
+        }
+        // Used for assign_header renderer.
+        $assignviewobj->context = $this->get_context();
+        $assignviewobj->show_intro = $this->show_intro();
+        $assignviewobj->course_module = $this->get_course_module();
+        $assignviewobj->course_module_id = $this->get_course_module()->id;
+        $assignviewobj->course_id = $this->get_course()->id;
+        $assignviewobj->feedback_plugins = $this->get_feedback_plugins();
+        $assignviewobj->submission_plugins = $this->get_submission_plugins();
+        $assignviewobj->can_view_grades = $this->can_view_grades();
+        $assignviewobj->can_view_submission = $this->can_view_submission($user->id);
+        $assignviewobj->is_team_submission = $this->instance->teamsubmission;
+        $assignviewobj->group_submission = null;
+        $assignviewobj->submission_group = null;
+        $assignviewobj->group_members_not_submitted = array();
+        $assignviewobj->is_any_submission_plugin_enabled = $this->is_any_submission_plugin_enabled();
+        if ($assignviewobj->can_view_grades || $assignviewobj->can_view_submission) {
+            $assignviewobj->grade = $this->get_user_grade($user->id, false);
+            $assignviewobj->submission = $this->get_user_submission($user->id, false);
+            if ($assignviewobj->is_team_submission) {
+                $assignviewobj->group_submission = $this->get_group_submission($user->id, 0, false);
+                $assignviewobj->submission_group = $this->get_submission_group($user->id);
+                $assignviewobj->groupid = $assignviewobj->submission_group ? $assignviewobj->submission_group->id : 0;
+                $assignviewobj->group_members_not_submitted = $this->get_submission_group_members_who_have_not_submitted($assignviewobj->groupid, false);
+            }
+        }
+        if ($assignviewobj->can_view_grades) {
+            $draft = ASSIGN_SUBMISSION_STATUS_DRAFT;
+            $submitted = ASSIGN_SUBMISSION_STATUS_SUBMITTED;
+
+            $defaultteammembers = null;
+            $assignviewobj->warn_of_ungrouped_users = false;
+            $activitygroup = groups_get_activity_group($this->get_course_module());
+            if ($assignviewobj->is_team_submission) {
+                $defaultteammembers = $this->get_submission_group_members(0, true);
+                $assignviewobj->warn_of_ungrouped_users = (count($defaultteammembers) > 0 && $assignviewobj->instance->preventsubmissionnotingroup);
+                $assignviewobj->participant_count = $this->count_teams($activitygroup);
+            } else {
+                $assignviewobj->warn_of_ungrouped_users = false;
+                $assignviewobj->participant_count = $this->count_participants($activitygroup);
+            }
+            $assignviewobj->submission_drafts_enabled = $this->instance->submissiondrafts;
+            $assignviewobj->submission_drafts_count = $this->count_submissions_with_status($draft);
+
+            $assignviewobj->submissions_submitted_count = $this->count_submissions_with_status($submitted);
+            $assignviewobj->cutoffdate = $this->instance->cutoffdate;
+            $assignviewobj->duedate = $this->instance->duedate;
+            $assignviewobj->count_submissions_need_grading = $this->count_submissions_need_grading();
+        }
+
+        if ($assignviewobj->can_view_submission) {
+            // View Student Summary Data.
+            $assignviewobj->flags = $this->get_user_flags($user->id, false);
+
+            $assignviewobj->can_edit_submission = $this->can_edit_submission($user->id);
+            $assignviewobj->grading_disabled = $this->grading_disabled($user->id, false);
+            $assignviewobj->submissions_open = $this->submissions_open($user->id);
+            $assignviewobj->show_edit_button = $assignviewobj->show_links
+                                                && $assignviewobj->is_any_submission_plugin_enabled
+                                                && $assignviewobj->can_edit_submission;
+            $assignviewobj->show_submit_button = $assignviewobj->show_links
+                                                && $assignviewobj->submissions_open
+                                                && $this->show_submit_button($assignviewobj->submission, $assignviewobj->group_submission, $user->id);
+            $assignviewobj->grade_locked = (($assignviewobj->flags && $assignviewobj->flags->locked) || $assignviewobj->grading_disabled);
+            $assignviewobj->extension_due_date = ($assignviewobj->flags) ? $assignviewobj->flags->extensionduedate : null;
+            $assignviewobj->view_full_names = has_capability('moodle/site:viewfullnames', $this->get_course_context());
+            $assignviewobj->grading_status = $this->get_grading_status($user->id);
+            $assignviewobj->user_has_submit_capability = has_capability('mod/assign:submit', $this->get_context(), $user);
+            $assignviewobj->is_graded = $this->is_graded($user->id);
+            $assignviewobj->return_action = $this->get_return_action();
+            $assignviewobj->return_params = $this->get_return_params();
+            $assignviewobj->view_type = assign_submission_status::STUDENT_VIEW;
+            $assignviewobj->is_blind_marking = $this->is_blind_marking();
+            // Grading criteria preview.
+            $gradingmanager = get_grading_manager($this->context, 'mod_assign', 'submissions');
+            $assignviewobj->grading_controller_preview = '';
+            if ($gradingmethod = $gradingmanager->get_active_method()) {
+                $controller = $gradingmanager->get_controller($gradingmethod);
+                if ($controller->is_form_defined()) {
+                    $assignviewobj->grading_controller_preview = $controller->render_preview($PAGE);
+                }
+            }
+
+            require_once($CFG->libdir . '/gradelib.php');
+            require_once($CFG->dirroot . '/grade/grading/lib.php');
+
+            $assignviewobj->grading_info = grade_get_grades($assignviewobj->course_id,
+                'mod',
+                'assign',
+                $assignviewobj->instance->id,
+                $user->id);
+
+            $assignviewobj->grading_item = null;
+            $assignviewobj->grade_book_grade = null;
+            if (isset($assignviewobj->grading_info->items[0])) {
+                $assignviewobj->grading_item = $assignviewobj->grading_info->items[0];
+                $assignviewobj->grade_book_grade = $assignviewobj->grading_item->grades[$user->id];
+            }
+            $emptyplugins = true;
+            if ($assignviewobj->grade) {
+                foreach ($assignviewobj->feedback_plugins as $plugin) {
+                    if ($plugin->is_visible() && $plugin->is_enabled()) {
+                        if (!$plugin->is_empty($assignviewobj->grade)) {
+                            $emptyplugins = false;
+                        }
+                    }
+                }
+            }
+            if ($assignviewobj->instance->markingworkflow
+                && $assignviewobj->grading_status != ASSIGN_MARKING_WORKFLOW_STATE_RELEASED) {
+                $emptyplugins = true; // Don't show feedback plugins until released either.
+            }
+            $assignviewobj->can_grade = has_capability('mod/assign:grade', $assignviewobj->context);
+
+            $assignviewobj->visible_grade = ((!is_null($assignviewobj->grade_book_grade->grade) || !$emptyplugins)
+                && ($assignviewobj->can_grade || !$assignviewobj->grade_book_grade->hidden));
+            $assignviewobj->grade_for_display = null;
+            $assignviewobj->graded_date = null;
+            $assignviewobj->grader = null;
+            if ($assignviewobj->visible_grade) {
+                $gradingmanager = get_grading_manager($assignviewobj->context, 'mod_assign', 'submissions');
+                // Only show the grade if it is not hidden in gradebook.
+                if (!is_null($assignviewobj->grade_book_grade->grade)
+                    && ($assignviewobj->can_grade || !$assignviewobj->grade_book_grade->hidden)
+                ) {
+                    if ($controller = $gradingmanager->get_active_controller()) {
+                        $menu = make_grades_menu($this->get_instance()->grade);
+                        $controller->set_grade_range($menu, $this->get_instance()->grade > 0);
+                        $assignviewobj->grade_for_display = $controller->render_grade($PAGE,
+                            $assignviewobj->grade->id,
+                            $assignviewobj->grading_item,
+                            $assignviewobj->grade_book_grade->str_long_grade,
+                            $assignviewobj->can_grade);
+                    } else {
+                        $assignviewobj->grade_for_display = $this->display_grade($assignviewobj->grade_book_grade->grade, false);
+                    }
+                    $assignviewobj->graded_date = $assignviewobj->grade_book_grade->dategraded;
+                    if (isset($assignviewobj->grade->grader)) { // This does't show when there are comments but no grade!
+                        $assignviewobj->grader = $DB->get_record('user', array('id' => $assignviewobj->grade->grader));
+                    }
+                }
+            }
+        }
+        $assignviewobj->current_url = new moodle_url('/mod/assign/view.php', array('id' => $assignviewobj->course_module_id));
+        $assignviewobj->all_submissions = $this->get_all_submissions($user->id);
+        $assignviewobj->all_grades = null;
+        if (count($assignviewobj->all_submissions > 1)) {
+            $assignviewobj->all_grades = $this->get_all_grades($user->id);
+        }
+
+        return $assignviewobj;
+    }
     /**
      * Add this instance to the database.
      *
@@ -3891,180 +4068,10 @@ class assign {
      * @return string - the html summary
      */
     public function view_student_summary($user, $showlinks) {
-        global $CFG, $DB, $PAGE;
+        $assignviewobj = $this->build_view_object($user, $showlinks);
+        $viewstudentsummary = new assign_submission_page($assignviewobj, true);
 
-        $instance = $this->get_instance();
-        $grade = $this->get_user_grade($user->id, false);
-        $flags = $this->get_user_flags($user->id, false);
-        $submission = $this->get_user_submission($user->id, false);
-        $o = '';
-
-        $teamsubmission = null;
-        $submissiongroup = null;
-        $notsubmitted = array();
-        if ($instance->teamsubmission) {
-            $teamsubmission = $this->get_group_submission($user->id, 0, false);
-            $submissiongroup = $this->get_submission_group($user->id);
-            $groupid = 0;
-            if ($submissiongroup) {
-                $groupid = $submissiongroup->id;
-            }
-            $notsubmitted = $this->get_submission_group_members_who_have_not_submitted($groupid, false);
-        }
-
-        if ($this->can_view_submission($user->id)) {
-            $showedit = $showlinks &&
-                        ($this->is_any_submission_plugin_enabled()) &&
-                        $this->can_edit_submission($user->id);
-
-            $gradelocked = ($flags && $flags->locked) || $this->grading_disabled($user->id, false);
-
-            // Grading criteria preview.
-            $gradingmanager = get_grading_manager($this->context, 'mod_assign', 'submissions');
-            $gradingcontrollerpreview = '';
-            if ($gradingmethod = $gradingmanager->get_active_method()) {
-                $controller = $gradingmanager->get_controller($gradingmethod);
-                if ($controller->is_form_defined()) {
-                    $gradingcontrollerpreview = $controller->render_preview($PAGE);
-                }
-            }
-
-            $showsubmit = ($showlinks && $this->submissions_open($user->id));
-            $showsubmit = ($showsubmit && $this->show_submit_button($submission, $teamsubmission, $user->id));
-
-            $extensionduedate = null;
-            if ($flags) {
-                $extensionduedate = $flags->extensionduedate;
-            }
-            $viewfullnames = has_capability('moodle/site:viewfullnames', $this->get_course_context());
-
-            $gradingstatus = $this->get_grading_status($user->id);
-            $submissionstatus = new assign_submission_status($instance->allowsubmissionsfromdate,
-                                                              $instance->alwaysshowdescription,
-                                                              $submission,
-                                                              $instance->teamsubmission,
-                                                              $teamsubmission,
-                                                              $submissiongroup,
-                                                              $notsubmitted,
-                                                              $this->is_any_submission_plugin_enabled(),
-                                                              $gradelocked,
-                                                              $this->is_graded($user->id),
-                                                              $instance->duedate,
-                                                              $instance->cutoffdate,
-                                                              $this->get_submission_plugins(),
-                                                              $this->get_return_action(),
-                                                              $this->get_return_params(),
-                                                              $this->get_course_module()->id,
-                                                              $this->get_course()->id,
-                                                              assign_submission_status::STUDENT_VIEW,
-                                                              $showedit,
-                                                              $showsubmit,
-                                                              $viewfullnames,
-                                                              $extensionduedate,
-                                                              $this->get_context(),
-                                                              $this->is_blind_marking(),
-                                                              $gradingcontrollerpreview,
-                                                              $instance->attemptreopenmethod,
-                                                              $instance->maxattempts,
-                                                              $gradingstatus,
-                                                              $instance->preventsubmissionnotingroup);
-            if (has_capability('mod/assign:submit', $this->get_context(), $user)) {
-                $o .= $this->get_renderer()->render($submissionstatus);
-            }
-
-            require_once($CFG->libdir.'/gradelib.php');
-            require_once($CFG->dirroot.'/grade/grading/lib.php');
-
-            $gradinginfo = grade_get_grades($this->get_course()->id,
-                                        'mod',
-                                        'assign',
-                                        $instance->id,
-                                        $user->id);
-
-            $gradingitem = null;
-            $gradebookgrade = null;
-            if (isset($gradinginfo->items[0])) {
-                $gradingitem = $gradinginfo->items[0];
-                $gradebookgrade = $gradingitem->grades[$user->id];
-            }
-
-            // Check to see if all feedback plugins are empty.
-            $emptyplugins = true;
-            if ($grade) {
-                foreach ($this->get_feedback_plugins() as $plugin) {
-                    if ($plugin->is_visible() && $plugin->is_enabled()) {
-                        if (!$plugin->is_empty($grade)) {
-                            $emptyplugins = false;
-                        }
-                    }
-                }
-            }
-
-            if ($this->get_instance()->markingworkflow && $gradingstatus != ASSIGN_MARKING_WORKFLOW_STATE_RELEASED) {
-                $emptyplugins = true; // Don't show feedback plugins until released either.
-            }
-
-            $cangrade = has_capability('mod/assign:grade', $this->get_context());
-            // If there is a visible grade, show the summary.
-            if ((!is_null($gradebookgrade->grade) || !$emptyplugins)
-                    && ($cangrade || !$gradebookgrade->hidden)) {
-
-                $gradefordisplay = null;
-                $gradeddate = null;
-                $grader = null;
-                $gradingmanager = get_grading_manager($this->get_context(), 'mod_assign', 'submissions');
-
-                // Only show the grade if it is not hidden in gradebook.
-                if (!is_null($gradebookgrade->grade) && ($cangrade || !$gradebookgrade->hidden)) {
-                    if ($controller = $gradingmanager->get_active_controller()) {
-                        $menu = make_grades_menu($this->get_instance()->grade);
-                        $controller->set_grade_range($menu, $this->get_instance()->grade > 0);
-                        $gradefordisplay = $controller->render_grade($PAGE,
-                                                                     $grade->id,
-                                                                     $gradingitem,
-                                                                     $gradebookgrade->str_long_grade,
-                                                                     $cangrade);
-                    } else {
-                        $gradefordisplay = $this->display_grade($gradebookgrade->grade, false);
-                    }
-                    $gradeddate = $gradebookgrade->dategraded;
-                    if (isset($grade->grader)) {
-                        $grader = $DB->get_record('user', array('id'=>$grade->grader));
-                    }
-                }
-
-                $feedbackstatus = new assign_feedback_status($gradefordisplay,
-                                                      $gradeddate,
-                                                      $grader,
-                                                      $this->get_feedback_plugins(),
-                                                      $grade,
-                                                      $this->get_course_module()->id,
-                                                      $this->get_return_action(),
-                                                      $this->get_return_params());
-
-                $o .= $this->get_renderer()->render($feedbackstatus);
-            }
-
-            $allsubmissions = $this->get_all_submissions($user->id);
-
-            if (count($allsubmissions) > 1) {
-                $allgrades = $this->get_all_grades($user->id);
-                $history = new assign_attempt_history($allsubmissions,
-                                                      $allgrades,
-                                                      $this->get_submission_plugins(),
-                                                      $this->get_feedback_plugins(),
-                                                      $this->get_course_module()->id,
-                                                      $this->get_return_action(),
-                                                      $this->get_return_params(),
-                                                      false,
-                                                      0,
-                                                      0);
-
-                $o .= $this->get_renderer()->render($history);
-            }
-
-        }
-        return $o;
+        return $this->get_renderer()->render($viewstudentsummary);
     }
 
     /**
