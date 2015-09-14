@@ -396,6 +396,7 @@ class core_userliblib_testcase extends advanced_testcase {
 
         $this->assertEquals(intval($matches[1]), $testsize);
         $this->assertEquals(intval($matches[2]), $testsize);
+
     }
 
     /**
@@ -447,31 +448,31 @@ class core_userliblib_testcase extends advanced_testcase {
         // Set current user to user 1.
         $this->setUser($user1);
         // User 1 can see User 1's profile.
-        $this->assertTrue(user_can_view_profile($user1));
+        $this->assertTrue(\core_user\profileviewmanager::user_can_view_profile($user1));
 
         $tempcfg = $CFG->forceloginforprofiles;
         $CFG->forceloginforprofiles = 0;
         // Not forced to log in to view profiles, should be able to see all profiles besides user 6.
         $users = array($user1, $user2, $user3, $user4, $user5, $user7);
         foreach ($users as $user) {
-            $this->assertTrue(user_can_view_profile($user));
+            $this->assertTrue(\core_user\profileviewmanager::user_can_view_profile($user));
         }
         // Restore setting.
         $CFG->forceloginforprofiles = $tempcfg;
 
         // User 1 can not see user 6 as they have been deleted.
-        $this->assertFalse(user_can_view_profile($user6));
+        $this->assertFalse(\core_user\profileviewmanager::user_can_view_profile($user6));
         // User 1 can see User 7 as they are a course contact.
-        $this->assertTrue(user_can_view_profile($user7));
+        $this->assertTrue(\core_user\profileviewmanager::user_can_view_profile($user7));
         // User 1 is in a course with user 2 and has the right capability - return true.
-        $this->assertTrue(user_can_view_profile($user2));
+        $this->assertTrue(\core_user\profileviewmanager::user_can_view_profile($user2));
         // User 1 is not in a course with user 3 - return false.
-        $this->assertFalse(user_can_view_profile($user3));
+        $this->assertFalse(\core_user\profileviewmanager::user_can_view_profile($user3));
 
         // Set current user to user 2.
         $this->setUser($user2);
         // User 2 is in a course with user 3 but does not have the right capability - return false.
-        $this->assertFalse(user_can_view_profile($user3));
+        $this->assertFalse(\core_user\profileviewmanager::user_can_view_profile($user3));
 
         // Set user 1 in one group and users 4 and 5 in another group.
         $group1 = $this->getDataGenerator()->create_group(array('courseid' => $course3->id));
@@ -481,10 +482,10 @@ class core_userliblib_testcase extends advanced_testcase {
         groups_add_member($group2->id, $user5->id);
         $this->setUser($user1);
         // Check that user 1 can not see user 4.
-        $this->assertFalse(user_can_view_profile($user4));
+        $this->assertFalse(\core_user\profileviewmanager::user_can_view_profile($user4));
         // Check that user 5 can see user 4.
         $this->setUser($user5);
-        $this->assertTrue(user_can_view_profile($user4));
+        $this->assertTrue(\core_user\profileviewmanager::user_can_view_profile($user4));
 
         $CFG->coursecontact = null;
     }

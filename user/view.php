@@ -127,7 +127,7 @@ if ($currentuser) {
     $PAGE->set_heading("$strpersonalprofile: ");
 
     // Check to see if the user can see this user's profile.
-    if (!user_can_view_profile($user, $course, $usercontext) && !$isparent) {
+    if (!\core_user\profileviewmanager::user_can_view_profile($user, $course, $usercontext) && !$isparent) {
         print_error('cannotviewprofile');
     }
 
