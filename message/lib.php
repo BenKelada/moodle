@@ -2541,13 +2541,12 @@ function message_mark_message_read($message, $timeread, $messageworkingempty=fal
     $message->timeread = $timeread;
 
     $messageid = $message->id;
-    unset($message->id);//unset because it will get a new id on insert into message_read
 
     //If any processors have pending actions abort them
     if (!$messageworkingempty) {
         $DB->delete_records('message_working', array('unreadmessageid' => $messageid));
     }
-    $messagereadid = $DB->insert_record('message_read', $message);
+    $DB->insert_record_raw('message_read', $message, true, false, true);
 
     $DB->delete_records('message', array('id' => $messageid));
 
@@ -2560,7 +2559,7 @@ function message_mark_message_read($message, $timeread, $messageworkingempty=fal
 
     // Trigger event for reading a message.
     $event = \core\event\message_viewed::create(array(
-        'objectid' => $messagereadid,
+        'objectid' => $messageid,
         'userid' => $message->useridto, // Using the user who read the message as they are the ones performing the action.
         'context' => $context,
         'relateduserid' => $message->useridfrom,
@@ -2570,7 +2569,7 @@ function message_mark_message_read($message, $timeread, $messageworkingempty=fal
     ));
     $event->trigger();
 
-    return $messagereadid;
+    return $messageid;
 }
 
 /**
