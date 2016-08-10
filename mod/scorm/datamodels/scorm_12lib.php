@@ -195,7 +195,13 @@ function get_scorm_default (&$userdata, $scorm, $scoid, $attempt, $mode) {
     $def['cmi.core.score.max'] = scorm_isset($userdata, 'cmi.core.score.max');
     $def['cmi.core.score.min'] = scorm_isset($userdata, 'cmi.core.score.min');
     $def['cmi.core.exit'] = scorm_isset($userdata, 'cmi.core.exit');
-    $def['cmi.suspend_data'] = scorm_isset($userdata, 'cmi.suspend_data');
+    $suspenddatatemp =  scorm_isset($userdata, 'cmi.suspend_data');
+    $jsonsuspenddata = json_decode($suspenddatatemp);
+    if(isset($jsonsuspenddata->steps) && !empty($jsonsuspenddata->steps)) {
+        $def['cmi.suspend_data'] = $suspenddatatemp;
+    } else {
+        $def['cmi.suspend_data'] = '';
+    }
     $def['cmi.comments'] = scorm_isset($userdata, 'cmi.comments');
     $def['cmi.student_preference.language'] = scorm_isset($userdata, 'cmi.student_preference.language');
     $def['cmi.student_preference.audio'] = scorm_isset($userdata, 'cmi.student_preference.audio', '0');
