@@ -1252,11 +1252,20 @@ function calendar_get_block_upcoming($events, $linkhref = NULL, $showcourselink 
                 $content .= $events[$i]->name;
             }
         }
+        // Begin OUA Custom : Wrapper div open - added to make display:table-cell work on the course and date divs.
+        $content .= '<div class="wrapper">';
+        // End OUA Custom.
+
         $events[$i]->time = str_replace('&raquo;', '<br />&raquo;', $events[$i]->time);
         if ($showcourselink && !empty($events[$i]->courselink)) {
             $content .= html_writer::div($events[$i]->courselink, 'course');
         }
         $content .= '<div class="date">'.$events[$i]->time.'</div></div>';
+
+        // Begin OUA Custom:  Wrapper div close.
+        $content .= '</div>';
+        // End OUA Custom.
+
         if ($i < $lines - 1) $content .= '<hr />';
     }
 

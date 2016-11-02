@@ -231,7 +231,7 @@ class core_message_events_testcase extends advanced_testcase {
         $message->useridfrom = '1';
         $message->useridto = '2';
         $message->subject = 'Subject';
-        $message->message = 'Message';
+        $message->smallmessage = 'Message';
         $message->id = $DB->insert_record('message', $message);
 
         // Trigger and capture the event.

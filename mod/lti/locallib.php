@@ -1843,9 +1843,16 @@ function lti_get_launch_container($lti, $toolconfig) {
     // Scrolling within the object element doesn't work on iOS or Android
     // Opening the popup window also had some issues in testing
     // For mobile devices, always take up the entire screen to ensure the best experience.
+    // OUA Custom: Allow mobiles to open in a new window.
+    /*
     if ($devicetype === core_useragent::DEVICETYPE_MOBILE || $devicetype === core_useragent::DEVICETYPE_TABLET ) {
         $launchcontainer = LTI_LAUNCH_CONTAINER_REPLACE_MOODLE_WINDOW;
     }
+    */
+    if ($lti->launchcontainer != LTI_LAUNCH_CONTAINER_WINDOW && ($devicetype === core_useragent::DEVICETYPE_MOBILE || $devicetype === core_useragent::DEVICETYPE_TABLET )) {
+        $launchcontainer = LTI_LAUNCH_CONTAINER_REPLACE_MOODLE_WINDOW;
+    }
+    // End OUA Custom.
 
     return $launchcontainer;
 }

@@ -1,0 +1,245 @@
+<?php
+if (!isset ($config->secret)) {
+$config->secret = 'bilbo';
+}
+if (!isset ($config->cookie_name)) {
+$config->cookie_name = 'oua_lms_cookie';
+}
+if (!isset ($config->shared_cookie_domain)) {
+$config->shared_cookie_domain = '.open.edu.au';
+}
+if (!isset ($config->dosinglelogout)) {
+$config->dosinglelogout = true;
+}
+if (!isset ($config->iterations)) {
+$config->iterations = 1000;
+}
+if (!isset ($config->timeout)) {
+$config->timeout = 3600;
+}
+if (!isset ($config->shared_login_url)) {
+$config->shared_login_url = 'https://www.open.edu.au/login/form?success=';
+}
+if (!isset ($config->no_account_url)) {
+$config->no_account_url = '';
+}
+if (!isset ($config->changepasswordurl)) {
+$config->changepasswordurl = 'https://www.open.edu.au/my-study-centre/my-profile/settings';
+}
+if (!isset ($config->logout_url)) {
+$config->logout_url = 'https://www.open.edu.au/login/do-logout';
+}
+if (!isset ($config->change_password_url)) {
+$config->change_password_url = 'https://www.open.edu.au/my-study-centre/my-profile/settings';
+}
+?>
+<table cellspacing="0" cellpadding="5" border="0">
+
+    <tr valign="top" class="required">
+        <td align="right"><label for="secret"><?php print_string('secret', 'auth_ouasharedcookie') ?>: </label>
+        </td>
+        <td>
+            <input name="secret" id="secret" type="text" size="30" value="<?php echo $config->secret ?>"/>
+            <?php
+
+        if (isset($err['secret'])) {
+            echo $OUTPUT->error_text($err['secret']);
+            }
+
+            ?>
+        </td>
+        <td>
+            <?php
+
+        print_string('secret_description', 'auth_ouasharedcookie');
+
+        ?>
+        </td>
+    </tr>
+    <tr valign="top" class="required">
+    <td align="right"><label for="shared_login_url"><?php print_string('shared_login_url', 'auth_ouasharedcookie') ?>
+        : </label></td>
+    <td>
+        <input name="shared_login_url" id="shared_login_url" type="text" size="30" value="<?php echo $config->shared_login_url ?>"/>
+        <?php
+
+        if (isset($err['shared_login_url'])) {
+            echo $OUTPUT->error_text($err['shared_login_url']);
+        }
+
+        ?>
+    </td>
+    <td>
+        <?php
+
+        print_string('shared_login_url_description', 'auth_ouasharedcookie');
+
+        ?>
+    </td>
+</tr>
+    <tr valign="top" class="required">
+        <td align="right"><label for="no_account_url"><?php print_string('no_account_url', 'auth_ouasharedcookie') ?>
+            : </label></td>
+        <td>
+            <input name="no_account_url" id="no_account_url" type="text" size="30" value="<?php echo $config->no_account_url ?>"/>
+            <?php
+
+        if (isset($err['no_account_url'])) {
+            echo $OUTPUT->error_text($err['no_account_url']);
+            }
+
+            ?>
+        </td>
+        <td>
+            <?php
+
+        print_string('no_account_url_description', 'auth_ouasharedcookie');
+
+        ?>
+        </td>
+    </tr>
+    <tr valign="top" class="required">
+    <td align="right"><label for="logout_url"><?php print_string('logout_url', 'auth_ouasharedcookie') ?>
+        : </label></td>
+    <td>
+        <input name="logout_url" id="logout_url" type="text" size="30" value="<?php echo $config->logout_url ?>"/>
+        <?php
+
+        if (isset($err['logout_url'])) {
+            echo $OUTPUT->error_text($err['logout_url']);
+        }
+
+        ?>
+    </td>
+    <td>
+        <?php
+
+        print_string('logout_url_description', 'auth_ouasharedcookie');
+
+        ?>
+    </td>
+</tr>
+    <tr valign="top" class="required">
+        <td align="right"><label for="change_password_url"><?php print_string('change_password_url', 'auth_ouasharedcookie') ?>
+            : </label></td>
+        <td>
+            <input name="change_password_url" id="change_password_url" type="text" size="30" value="<?php echo $config->change_password_url ?>"/>
+            <?php
+
+        if (isset($err['change_password_url'])) {
+            echo $OUTPUT->error_text($err['change_password_url']);
+            }
+
+            ?>
+        </td>
+        <td>
+            <?php
+
+        print_string('change_password_url_description', 'auth_ouasharedcookie');
+
+        ?>
+        </td>
+    </tr>
+    <tr valign="top" class="required">
+        <td align="right"><label for="cookie_name"><?php print_string('cookie_name', 'auth_ouasharedcookie') ?>
+            : </label></td>
+        <td>
+            <input name="cookie_name" id="cookie_name" type="text" size="30" value="<?php echo $config->cookie_name ?>"/>
+            <?php
+
+        if (isset($err['cookie_name'])) {
+            echo $OUTPUT->error_text($err['cookie_name']);
+            }
+
+            ?>
+        </td>
+        <td>
+            <?php
+
+        print_string('cookie_name_description', 'auth_ouasharedcookie');
+
+        ?>
+        </td>
+    </tr>
+    <tr valign="top" class="required">
+        <td align="right"><label
+                for="shared_cookie_domain"><?php print_string('shared_cookie_domain', 'auth_ouasharedcookie') ?>
+            : </label></td>
+        <td>
+            <input name="shared_cookie_domain" id="shared_cookie_domain" type="text" size="30"
+                   value="<?php echo $config->shared_cookie_domain ?>"/>
+            <?php
+
+        if (isset($err['shared_cookie_domain'])) {
+            echo $OUTPUT->error_text($err['shared_cookie_domain']);
+            }
+
+            ?>
+        </td>
+        <td>
+            <?php
+
+        print_string('shared_cookie_domain_description', 'auth_ouasharedcookie');
+
+        ?>
+        </td>
+    </tr>
+    <tr valign="top" class="required">
+        <td align="right"><label for="iterations"><?php print_string('iterations', 'auth_ouasharedcookie') ?>
+            : </label></td>
+        <td>
+            <input name="iterations" id="iterations" type="text" size="30" value="<?php echo $config->iterations ?>"/>
+            <?php
+
+        if (isset($err['iterations'])) {
+            echo $OUTPUT->error_text($err['iterations']);
+            }
+
+            ?>
+        </td>
+        <td>
+            <?php
+
+        print_string('iterations_description', 'auth_ouasharedcookie');
+
+        ?>
+        </td>
+    </tr>
+
+    <tr valign="top" class="required">
+        <td align="right"><label for="timeout"><?php print_string('timeout', 'auth_ouasharedcookie') ?>
+            : </label></td>
+        <td>
+            <input name="timeout" id="timeout" type="text" size="30" value="<?php echo $config->timeout ?>"/>
+            <?php
+
+        if (isset($err['timeout'])) {
+            echo $OUTPUT->error_text($err['timeout']);
+            }
+
+            ?>
+        </td>
+        <td>
+            <?php
+
+        print_string('timeout_description', 'auth_ouasharedcookie');
+
+        ?>
+        </td>
+    </tr>
+
+    <tr valign="top">
+        <td class="right"><?php print_string("dosinglelogout", "auth_ouasharedcookie"); ?>:</td>
+        <td>
+            <input name="dosinglelogout" type="checkbox" <?php if($config->dosinglelogout) echo 'checked="CHECKED"'; ?> />
+        </td>
+        <td><?php print_string("dosinglelogout_description", "auth_ouasharedcookie"); ?></td>
+    </tr>
+
+
+    <?php
+
+print_auth_lock_options($this->authtype, $user_fields, get_string('auth_fieldlocks_help', 'auth'), false, false);
+
+    ?>
+</table>

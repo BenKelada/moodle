@@ -97,6 +97,8 @@ class mod_lesson_mod_form extends moodleform_mod {
         // Appearance.
         $mform->addElement('header', 'appearancehdr', get_string('appearance'));
 
+        // OUA Custom: remove media file
+        /*
         $filemanageroptions = array();
         $filemanageroptions['filetypes'] = '*';
         $filemanageroptions['maxbytes'] = $this->course->maxbytes;
@@ -105,11 +107,18 @@ class mod_lesson_mod_form extends moodleform_mod {
 
         $mform->addElement('filemanager', 'mediafile', get_string('mediafile', 'lesson'), null, $filemanageroptions);
         $mform->addHelpButton('mediafile', 'mediafile', 'lesson');
-
+        */
         $mform->addElement('selectyesno', 'progressbar', get_string('progressbar', 'lesson'));
         $mform->addHelpButton('progressbar', 'progressbar', 'lesson');
         $mform->setDefault('progressbar', 0);
 
+        // OUA Custom: make progress bar advanced
+        $mform->setAdvanced('progressbar');
+
+        // Media file needs to be set for post processing, set to 0.
+        $mform->addElement('hidden', 'mediafile', 0);
+        $mform->setType('mediafile', PARAM_INT);
+        // End OUA Custom.
         $mform->addElement('selectyesno', 'ongoing', get_string('ongoing', 'lesson'));
         $mform->addHelpButton('ongoing', 'ongoing', 'lesson');
         $mform->setDefault('ongoing', 0);
@@ -173,11 +182,15 @@ class mod_lesson_mod_form extends moodleform_mod {
         $mform->addElement('date_time_selector', 'deadline', get_string('deadline', 'lesson'), array('optional'=>true));
         $mform->setDefault('deadline', 0);
 
+        // OUA Custom: Remove timelimit.
+        /*
         // Time limit.
         $mform->addElement('duration', 'timelimit', get_string('timelimit', 'lesson'),
                 array('optional' => true));
         $mform->addHelpButton('timelimit', 'timelimit', 'lesson');
 
+        */
+        // End OUA Custom.
         $mform->addElement('selectyesno', 'usepassword', get_string('usepassword', 'lesson'));
         $mform->addHelpButton('usepassword', 'usepassword', 'lesson');
         $mform->setDefault('usepassword', 0);

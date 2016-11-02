@@ -142,6 +142,14 @@ class filter_mediaplugin_testcase extends advanced_testcase {
         $this->assertEquals(1, substr_count($filter, 'M.util.add_audio_player'));
         $this->assertContains($longurl, $filter);
 
+        /* OUA CUSTOM: Allows Youtube API call by adding 'enablejsapi=1&' to the query string  */
+        $validpaddedurl = '<p>Some text.</p><pre style="color: rgb(0, 0, 0); line-height: normal;"><span class="mediaplugin mediaplugin_youtube">
+<iframe title="Valid link" width="400" height="300"
+  src="https://www.youtube.com/embed/uUhWl9Lm3OM?enablejsapi=1&amp;rel=0&amp;wmode=transparent" frameborder="0" allowfullscreen="1"></iframe>
+</span></pre><pre style="color: rgb(0, 0, 0); line-height: normal;">';
+        $validpaddedurl = str_pad($validpaddedurl, 6000 + (strlen($validpaddedurl) - strlen($originalurl)), 'z');
+        /* END OUA CUSTOM */
+
         // Testing for cases where: to be filtered content has 6+ text afterwards.
         $filter = $filterplugin->filter($paddedurl);
         $this->assertEquals($validpaddedurl, $filter, $msg);

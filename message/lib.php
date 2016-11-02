@@ -1190,6 +1190,8 @@ function message_can_delete_message($message, $userid) {
 function message_delete_message($message, $userid) {
     global $DB;
 
+    // OUA CUSTOM:
+    /*
     // The column we want to alter.
     if ($message->useridfrom == $userid) {
         $coltimedeleted = 'timeuserfromdeleted';
@@ -1198,6 +1200,16 @@ function message_delete_message($message, $userid) {
     } else {
         return false;
     }
+    */
+    // Switch logic so we can delete notifications sent to myself.
+    if ($message->useridto == $userid) {
+        $coltimedeleted = 'timeusertodeleted';
+    } else if ($message->useridfrom == $userid) {
+        $coltimedeleted = 'timeuserfromdeleted';
+    } else {
+        return false;
+    }
+    // END OUA Custom.
 
     // Don't update it if it's already been deleted.
     if ($message->$coltimedeleted > 0) {
@@ -2534,14 +2546,21 @@ function message_mark_message_read($message, $timeread, $messageworkingempty=fal
     $message->timeread = $timeread;
 
     $messageid = $message->id;
+    // OUA CUSTOM: keep id message id between message/message_read table.
+    /*
     unset($message->id);//unset because it will get a new id on insert into message_read
-
+    */
     //If any processors have pending actions abort them
     if (!$messageworkingempty) {
         $DB->delete_records('message_working', array('unreadmessageid' => $messageid));
     }
+    // OUA CUSTOM: keep id message id between message/message_read table.
+    /*
     $messagereadid = $DB->insert_record('message_read', $message);
-
+     */
+    $DB->insert_record_raw('message_read', $message, true, false, true);
+    $messagereadid = $messageid;
+    // END OUA CUSTOM.
     $DB->delete_records('message', array('id' => $messageid));
 
     // Get the context for the user who received the message.

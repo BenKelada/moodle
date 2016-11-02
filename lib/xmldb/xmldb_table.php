@@ -44,7 +44,13 @@ class xmldb_table extends xmldb_object {
      *
      * @const maximum length of field names
      */
+    /* OUA CUSTOM: MAX Length set to 59 for postgres (63 postgres max - 4 for mdl_ prefix)
+                This drops oracle support
     const NAME_MAX_LENGTH = 28;
+    */
+
+    const NAME_MAX_LENGTH = 59;
+    /* END OUA CUSTOM */
 
     /**
      * Creates one new xmldb_table

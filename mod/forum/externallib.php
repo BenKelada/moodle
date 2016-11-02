@@ -648,7 +648,7 @@ class mod_forum_external extends external_api {
         // Check they have the view forum capability.
         require_capability('mod/forum:viewdiscussion', $modcontext, null, true, 'noviewdiscussionspermission', 'forum');
 
-        $sort = 'd.' . $sortby . ' ' . $sortdirection;
+        $sort = 'd.pinned DESC, d.' . $sortby . ' ' . $sortdirection;
         $alldiscussions = forum_get_discussions($cm, $sort, true, -1, -1, true, $page, $perpage, FORUM_POSTS_ALL_USER_GROUPS);
 
         if ($alldiscussions) {
@@ -802,7 +802,8 @@ class mod_forum_external extends external_api {
                                 'userpictureurl' => new external_value(PARAM_URL, 'Post author picture.'),
                                 'usermodifiedpictureurl' => new external_value(PARAM_URL, 'Post modifier picture.'),
                                 'numreplies' => new external_value(PARAM_TEXT, 'The number of replies in the discussion'),
-                                'numunread' => new external_value(PARAM_INT, 'The number of unread discussions.')
+                                'numunread' => new external_value(PARAM_INT, 'The number of unread discussions.'),
+                                'pinned' => new external_value(PARAM_TEXT, 'Is the discussion pinned')
                             ), 'post'
                         )
                     ),
@@ -958,9 +959,16 @@ class mod_forum_external extends external_api {
                 'options' => new external_multiple_structure (
                     new external_single_structure(
                         array(
+                            /* OUA CUSTOM:
+                            Add itemid to add inline attachments to ajax posts.
+                            See commit for other additions.
+                            Submitted to core as MDL-53345.
+                            */
                             'name' => new external_value(PARAM_ALPHANUM,
                                         'The allowed keys (value format) are:
                                         discussionsubscribe (bool); subscribe to the discussion?, default to true
+                                        inlineattachmentsid              (int); the draft file area id for inline attachments
+                                        attachmentsid       (int); the draft file area id for attachments
                             '),
                             'value' => new external_value(PARAM_RAW, 'the value of the option,
                                                             this param is validated in the external function.'
@@ -995,13 +1003,21 @@ class mod_forum_external extends external_api {
                                             ));
         // Validate options.
         $options = array(
-            'discussionsubscribe' => true
+            'discussionsubscribe' => true,
+            'inlineattachmentsid' => 0,
+            'attachmentsid' => null
         );
         foreach ($params['options'] as $option) {
             $name = trim($option['name']);
             switch ($name) {
                 case 'discussionsubscribe':
                     $value = clean_param($option['value'], PARAM_BOOL);
+                    break;
+                case 'inlineattachmentsid':
+                    $value = clean_param($option['value'], PARAM_INT);
+                    break;
+                case 'attachmentsid':
+                    $value = clean_param($option['value'], PARAM_INT);
                     break;
                 default:
                     throw new moodle_exception('errorinvalidparam', 'webservice', '', $name);
@@ -1041,9 +1057,10 @@ class mod_forum_external extends external_api {
         $post->message = $params['message'];
         $post->messageformat = FORMAT_HTML;   // Force formatting for now.
         $post->messagetrust = trusttext_trusted($context);
-        $post->itemid = 0;
-
-        if ($postid = forum_add_new_post($post, null)) {
+        $post->itemid = $options['inlineattachmentsid'];
+        $post->attachments = $options['attachmentsid'];
+        $fakemform = $post->attachments;
+        if ($postid = forum_add_new_post($post, $fakemform)) {
 
             $post->id = $postid;
 
@@ -1116,6 +1133,9 @@ class mod_forum_external extends external_api {
                             'name' => new external_value(PARAM_ALPHANUM,
                                         'The allowed keys (value format) are:
                                         discussionsubscribe (bool); subscribe to the discussion?, default to true
+                                        discussionpinned    (bool); is the discussion pinned, default to false
+                                        inlineattachmentsid              (int); the draft file area id for inline attachments
+                                        attachmentsid       (int); the draft file area id for attachments
                             '),
                             'value' => new external_value(PARAM_RAW, 'The value of the option,
                                                             This param is validated in the external function.'
@@ -1152,13 +1172,25 @@ class mod_forum_external extends external_api {
                                             ));
         // Validate options.
         $options = array(
-            'discussionsubscribe' => true
+            'discussionsubscribe' => true,
+            'discussionpinned' => false,
+            'inlineattachmentsid' => 0,
+            'attachmentsid' => null
         );
         foreach ($params['options'] as $option) {
             $name = trim($option['name']);
             switch ($name) {
                 case 'discussionsubscribe':
                     $value = clean_param($option['value'], PARAM_BOOL);
+                    break;
+                case 'discussionpinned':
+                    $value = clean_param($option['value'], PARAM_BOOL);
+                    break;
+                case 'inlineattachmentsid':
+                    $value = clean_param($option['value'], PARAM_INT);
+                    break;
+                case 'attachmentsid':
+                    $value = clean_param($option['value'], PARAM_INT);
                     break;
                 default:
                     throw new moodle_exception('errorinvalidparam', 'webservice', '', $name);
@@ -1204,15 +1236,22 @@ class mod_forum_external extends external_api {
         $discussion->message = $params['message'];
         $discussion->messageformat = FORMAT_HTML;   // Force formatting for now.
         $discussion->messagetrust = trusttext_trusted($context);
-        $discussion->itemid = 0;
+        $discussion->itemid = $options['inlineattachmentsid'];
         $discussion->groupid = $groupid;
         $discussion->mailnow = 0;
         $discussion->subject = $params['subject'];
         $discussion->name = $discussion->subject;
         $discussion->timestart = 0;
         $discussion->timeend = 0;
+        $discussion->attachments = $options['attachmentsid'];
 
-        if ($discussionid = forum_add_discussion($discussion)) {
+        if (has_capability('mod/forum:pindiscussions', $context) && $options['discussionpinned']) {
+            $discussion->pinned = FORUM_DISCUSSION_PINNED;
+        } else {
+            $discussion->pinned = FORUM_DISCUSSION_UNPINNED;
+        }
+        $fakemform = $options['attachmentsid'];
+        if ($discussionid = forum_add_discussion($discussion, $fakemform)) {
 
             $discussion->id = $discussionid;
 

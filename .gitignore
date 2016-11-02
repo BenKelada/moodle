@@ -13,6 +13,7 @@
 /lib/editor/tinymce/extra/tools/temp/
 *~
 *.swp
+*.iml
 /tags
 /TAGS
 /cscope.*
@@ -35,4 +36,6 @@ composer.phar
 # lib/yuilib/version/module/module-coverage.js
 /lib/yuilib/*/*/*-coverage.js
 atlassian-ide-plugin.xml
-/node_modules/
+/node_modules
+grunt_process.txt
+less_checker.txt

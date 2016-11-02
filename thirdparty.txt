@@ -1,0 +1,26 @@
+THIRD PARTY MODULES
+-------------------
+
+As part of developing the required modules for Moodle enhancements, we must import a list of third party items.
+We track those here so when Moodle is upgraded, we can obtained updated versions to work with the new Moodle version.
+
+They should also be reviewed as part of bugfix releases to ensure we have upgraded versions of the plugins as well.
+
+Modules not listed here and not in the Moodle core source tree are developed as custom code by Open Universities Australia.
+
+Folder in Moodle	Source Location and hash if git.
+----------------------------------------------------------------------------------------------------------------------------------------
+cache/stores/redis	        git clone https://github.com/moodlerooms/moodle-cachestore_redis.git	7e6461a48231ad53ce4799854015cc92af6c14df
+
+blocks/elluminate               This module is downloaded from blackboard and requires an account
+mod/elluminate                  http://support.blackboardcollaborate.com/ics/support/default.asp?deptID=8336&task=knowledge&questionID=271
+                                or
+                                https://blackboard.secure.force.com/login
+                                The contents of this directory was unzipped from moodle_315-3-for_bcwc
+                                It needed some customisations to remove deprecated elements to avoid warnings
+theme/bootstrap                 git clone https://github.com/bmbrands/theme_bootstrap.git HASH: 9de1a824557ae7a7ace62bb76ee04764dbcbc9ce
+                                This is the WIP moodle bootstrap 3 theme, that allows you to use bootstrap 3 classes within moodle.
+                                We have updated our clean theme to be based off this in order to use bootstrap 3 classes and js
+
+mod/certificate             https://github.com/markn86/moodle-mod_certificate/commit/345f5b1dfe63d55f4e0c4ed7ffc2665b58601061
+                            We have modified the certificate module to use an instance specific background image.

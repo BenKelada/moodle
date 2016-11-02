@@ -1,0 +1,12 @@
+For merging/upgrading to moodle 3.0 (or updating 2.9)
+
+/USER: (MDL-51384)
+user/view user/profile commits backported from moodle 3.0
+We have backported commits from moodle 3.0 for the user/profile and user/view pages
+We have removed tests that down work with moodle 2.9
+
+
+
+MOD/ASSIGN: ( MDL-50765 )
+Mod assign was modified to use a renderer and mustache templates, this patch was submitted to core MDL-50765
+These changes will need to be re-applied if we want to be able to override the assign page in our theme

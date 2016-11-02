@@ -185,6 +185,10 @@ class mod_forum_generator extends testing_module_generator {
             $record['mailnow'] = "0";
         }
 
+        if (!isset($record['pinned'])) {
+            $record['pinned'] = "0";
+        }
+
         if (isset($record['timemodified'])) {
             $timemodified = $record['timemodified'];
         }

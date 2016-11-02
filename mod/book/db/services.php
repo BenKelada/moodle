@@ -33,7 +33,10 @@ $functions = array(
         'methodname'    => 'view_book',
         'description'   => 'Simulate the view.php web interface book: trigger events, completion, etc...',
         'type'          => 'write',
-        'capabilities'  => 'mod/book:read'
+        'capabilities'  => 'mod/book:read',
+        /* OUA Custom Enable ajax */
+        'ajax'        => true,
+        /* End OUA Custom */
     ),
 
     'mod_book_get_books_by_courses' => array(

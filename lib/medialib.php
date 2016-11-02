@@ -549,6 +549,15 @@ class core_media_player_youtube extends core_media_player_external {
             // This video is part of a playlist, and we want to embed it as such.
             $params .= "list=$listid&amp;";
         }
+        /**
+         * OUA CUSTOM: Allows Youtube API so we can pauseVideo when user navigates to another page without stopping the video.
+         */
+        $jsapi = $url->param('enablejsapi');
+        if ($jsapi === null || $jsapi != '0') {
+            // Allows video controls by Javascript using Youtube video API.
+            $params .= "enablejsapi=1&amp;";
+        }
+        // End OUA CUSTOM.
 
         return <<<OET
 <span class="mediaplugin mediaplugin_youtube">
