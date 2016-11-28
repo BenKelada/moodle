@@ -324,6 +324,9 @@ abstract class advanced_testcase extends base_testcase {
         }
 
         $debugging = $this->getDebuggingMessages();
+        $message .= "\n".phpunit_util::display_debugging_messages(true);
+        $this->resetDebugging();
+
         $this->assertEquals($expectedcount, count($debugging), $message);
 
         if ($debugmessages) {
@@ -343,8 +346,6 @@ abstract class advanced_testcase extends base_testcase {
                 $this->assertSame($debuglevel, $debugging[$key]->level, $message);
             }
         }
-
-        $this->resetDebugging();
     }
 
     /**
