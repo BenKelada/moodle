@@ -17,7 +17,7 @@ defined('MOODLE_INTERNAL') || exit();
 
 /**
  * Unit tests for the subscription class.
- * @since 3.0.5
+ * @since 3.1.1
  *
  * @package    tool_monitor
  * @category   test

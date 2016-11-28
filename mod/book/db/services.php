@@ -34,6 +34,7 @@ $functions = array(
         'description'   => 'Simulate the view.php web interface book: trigger events, completion, etc...',
         'type'          => 'write',
         'capabilities'  => 'mod/book:read',
+        'services'      => array(MOODLE_OFFICIAL_MOBILE_SERVICE),
         /* OUA Custom Enable ajax */
         'ajax'        => true,
         /* End OUA Custom */
@@ -45,6 +46,7 @@ $functions = array(
         'description'   => 'Returns a list of book instances in a provided set of courses,
                             if no courses are provided then all the book instances the user has access to will be returned.',
         'type'          => 'read',
-        'capabilities'  => ''
+        'capabilities'  => '',
+        'services'      => array(MOODLE_OFFICIAL_MOBILE_SERVICE)
     )
 );

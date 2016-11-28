@@ -28,6 +28,15 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 
 require_once($CFG->dirroot . '/mod/assign/tests/locallib_test.php');
+require_once($CFG->dirroot . '/local/oua_utility/oua_advanced_testcase.php');
+
+/**
+ * Class theme_ouaclean_mod_assign_locallib_validator
+ * Extend abstract class so we can use our custom validation methods, when we are already extending assignment testcase.
+ */
+class theme_ouaclean_mod_assign_locallib_validator extends oua_advanced_testcase {
+
+}
 
 /**
  * Unit tests for (some of) mod/assign/locallib.php.
@@ -114,10 +123,8 @@ class theme_ouaclean_mod_assign_locallib_testcase extends mod_assign_locallib_te
         // Should have feedback but no grade.
         $this->setUser($this->students[0]);
         $output = $assign->view_student_summary($this->students[0], true);
-        libxml_use_internal_errors(true);
-        $dom = simplexml_load_string($output);
-        $this->assertInstanceOf('SimpleXMLElement', $dom, 'The HTML must be valid well formed HTML. We actually got: ' .
-            $output . "\nErrors: " . var_export(libxml_get_errors(), true));
+        $ouatest = new theme_ouaclean_mod_assign_locallib_validator();
+        $ouatest->assertValidHtml($output);
         $this->assertNotEquals(false, strpos($output, get_string('tutor_response', 'theme_ouaclean')), 'Show feedback even if there is no grade');
         $this->assertEquals(false, strpos($output, 'Grade'), 'Do not show grade when there is no grade.');
         $this->assertEquals(false, strpos($output, 'Graded on'), 'Do not show graded date when there is no grade.');
@@ -184,7 +191,8 @@ class theme_ouaclean_mod_assign_locallib_testcase extends mod_assign_locallib_te
         // Check the student can see the grade.
         $this->setUser($this->students[0]);
         $output = $assign->view_student_summary($this->students[0], true);
-        $this->assertNotEquals(false, strpos($output, '50.0'));
+
+        $this->assertNotEquals(false, strpos($output, '50.0'), $output);
 
         // Allow the student another attempt.
         $this->teachers[0]->ignoresesskey = true;

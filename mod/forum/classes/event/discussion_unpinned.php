@@ -100,10 +100,20 @@ class discussion_unpinned extends \core\event\base {
         }
     }
 
+    /**
+     * Forum discussion object id mappings.
+     *
+     * @return array
+     */
     public static function get_objectid_mapping() {
         return array('db' => 'forum_discussions', 'restore' => 'forum_discussion');
     }
 
+    /**
+     * Forum id mappings.
+     *
+     * @return array
+     */
     public static function get_other_mapping() {
         $othermapped = array();
         $othermapped['forumid'] = array('db' => 'forum', 'restore' => 'forum');

@@ -35,19 +35,17 @@ env:
     # Run unit tests on Postgres
     - DB=pgsql    TASK=PHPUNIT
 
+    # Perform an upgrade test too.
+    - DB=pgsql    TASK=UPGRADE
+
+    # Run a check for unbuilt files with Grunt.
+    - DB=none     TASK=GRUNT
+
 matrix:
     # Enable fast finish.
     # This will fail the build if a single job fails (except those in allow_failures).
     # It will not stop the jobs from running.
     fast_finish: true
-
-    include:
-          # Run grunt/npm install on lowest supported npm version
-        - php: 7
-          env: DB=none     TASK=GRUNT   NVM_VERSION='0.10'
-          # Run grunt/npm install on highest version ('node' is an alias for the latest node.js version.)
-        - php: 7
-          env: DB=none     TASK=GRUNT   NVM_VERSION='node'
 
     exclude:
         # MySQL - it's just too slow.
@@ -64,6 +62,10 @@ matrix:
         - env: DB=none     TASK=GRUNT
           php: 5.4
 
+        # Moodle 2.7 is not compatible with PHP 7 for the upgrade test.
+        - env: DB=pgsql    TASK=UPGRADE
+          php: 7.0
+
 cache:
     directories:
       - $HOME/.composer/cache
@@ -73,30 +75,18 @@ install:
     # Disable xdebug. We aren't generating code coverage, and it has a huge impact upon test performance.
     - rm /home/travis/.phpenv/versions/$(phpenv version-name)/etc/conf.d/xdebug.ini
 
-    - >
-        if [ "$TASK" = 'PHPUNIT' ];
-        then
-            if [ -n "$GITHUB_APITOKEN" ]; then
-                composer config github-oauth.github.com $GITHUB_APITOKEN;
-                echo 'auth.json' >> .git/info/exclude
-            fi
+    # Set the encrypted GITHUB_TOKEN if it's available to raise the API limit.
+    - if [ -n "$GITHUB_APITOKEN" ]; then composer config github-oauth.github.com $GITHUB_APITOKEN; fi
+    - echo 'auth.json' >> .git/info/exclude
 
-            # Install composer dependencies.
-            # We need --no-interaction in case we hit API limits for composer. This causes it to fall back to a standard clone.
-            # Typically it should be able to use the Composer cache if any other job has already completed before we started here.
-            travis_retry composer install --prefer-dist --no-interaction;
-        fi
-
-    - >
-        if [ "$TASK" = 'GRUNT' ];
-        then
-            nvm install $NVM_VERSION ;
-            nvm use $NVM_VERSION ;
-        fi
+    # Install composer dependencies.
+    # We need --no-interaction in case we hit API limits for composer. This causes it to fall back to a standard clone.
+    # Typically it should be able to use the Composer cache if any other job has already completed before we started here.
+    - travis_retry composer install --prefer-dist --no-interaction
 
 before_script:
     - >
-      if [ "$TASK" = 'PHPUNIT' ];
+      if [ "$TASK" = 'PHPUNIT' -o "$TASK" = 'UPGRADE' ];
       then
         # Copy generic configuration in place.
         cp config-dist.php config.php ;
@@ -159,8 +149,9 @@ before_script:
     - >
       if [ "$TASK" = 'GRUNT' ];
       then
-        npm install --no-spin;
-        npm install --no-spin -g grunt ;
+        npm install ;
+        npm install -g grunt ;
+        grunt ;
       fi
 
     ########################################################################
@@ -179,7 +170,7 @@ before_script:
         # We need the official upstream for comparison
         git remote add upstream https://github.com/moodle/moodle.git;
 
-        git fetch upstream MOODLE_30_STABLE;
+        git fetch upstream MOODLE_31_STABLE;
         export GIT_PREVIOUS_COMMIT="`git merge-base FETCH_HEAD $TRAVIS_COMMIT`";
         export GIT_COMMIT="$TRAVIS_COMMIT";
         export UPSTREAM_FETCH_HEAD=`git rev-parse FETCH_HEAD`
@@ -190,11 +181,30 @@ before_script:
         export phpcmd=`which php`;
       fi
 
-    # Actually run the CI Tests - do this outside of the main test to make output clearer.
+    ########################################################################
+    # Upgrade test
+    ########################################################################
     - >
-      if [ "$TASK" = 'CITEST' ];
+      if [ "$TASK" = 'UPGRADE' ];
       then
-        bash local/ci/php_lint/php_lint.sh;
+        # We need the official upstream.
+        git remote add upstream https://github.com/moodle/moodle.git;
+
+        # Checkout 27 STABLE branch.
+        git fetch upstream MOODLE_27_STABLE;
+        git checkout MOODLE_27_STABLE;
+
+        # Perform the upgrade
+        php admin/cli/install_database.php --agree-license --adminpass=Password --adminemail=admin@example.com --fullname="Upgrade test" --shortname=Upgrade;
+
+        # Return to the previous commit
+        git checkout -;
+
+        # Perform the upgrade
+        php admin/cli/upgrade.php --non-interactive --allow-unstable ;
+
+        # The local_ci repository can be used to check upgrade savepoints.
+        git clone https://github.com/moodlehq/moodle-local_ci.git local/ci ;
       fi
 
 script:
@@ -213,9 +223,25 @@ script:
     - >
       if [ "$TASK" = 'GRUNT' ];
       then
-        grunt ;
         # Add all files to the git index and then run diff --cached to see all changes.
         # This ensures that we get the status of all files, including new files.
         git add . ;
         git diff --cached --exit-code ;
+      fi
+
+    ########################################################################
+    # Upgrade test
+    ########################################################################
+    - >
+      if [ "$TASK" = 'UPGRADE' ];
+      then
+        cp local/ci/check_upgrade_savepoints/check_upgrade_savepoints.php ./check_upgrade_savepoints.php
+        result=`php check_upgrade_savepoints.php`;
+        # Check if there are problems
+        count=`echo "$result" | grep -P "ERROR|WARN" | wc -l` ;
+        if (($count > 0));
+        then
+          echo "$result"
+          exit 1 ;
+        fi
       fi

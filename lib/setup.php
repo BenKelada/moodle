@@ -572,9 +572,6 @@ if (!empty($_SERVER['HTTP_X_moz']) && $_SERVER['HTTP_X_moz'] === 'prefetch'){
 //point pear include path to moodles lib/pear so that includes and requires will search there for files before anywhere else
 //the problem is that we need specific version of quickforms and hacked excel files :-(
 ini_set('include_path', $CFG->libdir.'/pear' . PATH_SEPARATOR . ini_get('include_path'));
-//point zend include path to moodles lib/zend so that includes and requires will search there for files before anywhere else
-//please note zend library is supposed to be used only from web service protocol classes, it may be removed in future
-ini_set('include_path', $CFG->libdir.'/zend' . PATH_SEPARATOR . ini_get('include_path'));
 
 // Register our classloader, in theory somebody might want to replace it to load other hacked core classes.
 if (defined('COMPONENT_CLASSLOADER')) {
@@ -947,6 +944,17 @@ if ($USER && function_exists('apache_note')
     apache_note('MOODLEUSER', $logname);
 }
 
+// Ensure the urlrewriteclass is setup correctly (to avoid crippling site).
+if (isset($CFG->urlrewriteclass)) {
+    if (!class_exists($CFG->urlrewriteclass)) {
+        debugging("urlrewriteclass {$CFG->urlrewriteclass} was not found, disabling.");
+        unset($CFG->urlrewriteclass);
+    } else if (!in_array('core\output\url_rewriter', class_implements($CFG->urlrewriteclass))) {
+        debugging("{$CFG->urlrewriteclass} does not implement core\output\url_rewriter, disabling.", DEBUG_DEVELOPER);
+        unset($CFG->urlrewriteclass);
+    }
+}
+
 // Use a custom script replacement if one exists
 if (!empty($CFG->customscripts)) {
     if (($customscript = custom_script_path()) !== false) {
@@ -1028,6 +1036,12 @@ if (isset($CFG->maintenance_later) and $CFG->maintenance_later <= time()) {
     } else if (!CLI_SCRIPT) {
         redirect(new moodle_url('/'));
     }
+}
+
+// Add behat_shutdown_function to shutdown manager, so we can capture php errors,
+// but not necessary for behat CLI command as it's being captured by behat process.
+if (defined('BEHAT_SITE_RUNNING') && !defined('BEHAT_TEST')) {
+    core_shutdown_manager::register_function('behat_shutdown_function');
 }
 
 // note: we can not block non utf-8 installations here, because empty mysql database

@@ -41,6 +41,7 @@ var AJAXBASE = M.cfg.wwwroot + '/mod/assign/feedback/editpdf/ajax.php',
         ANNOTATIONCOLOURBUTTON :  '.annotationcolourbutton',
         DELETEANNOTATIONBUTTON : '.deleteannotationbutton',
         UNSAVEDCHANGESDIV : '.assignfeedback_editpdf_unsavedchanges',
+        UNSAVEDCHANGESINPUT : 'input[name="assignfeedback_editpdf_haschanges"]',
         STAMPSBUTTON : '.currentstampbutton',
         DIALOGUE : '.' + CSS.DIALOGUE
     },
@@ -72,6 +73,7 @@ var AJAXBASE = M.cfg.wwwroot + '/mod/assign/feedback/editpdf/ajax.php',
         'oval': '.ovalbutton',
         'stamp': '.stampbutton',
         'select': '.selectbutton',
+        'drag': '.dragbutton',
         'highlight': '.highlightbutton'
     },
     STROKEWEIGHT = 4;

@@ -70,10 +70,7 @@ if (isguestuser($user)) {
 }
 
 // User interests separated by commas.
-if (!empty($CFG->usetags)) {
-    require_once($CFG->dirroot.'/tag/lib.php');
-    $user->interests = tag_get_tags_array('user', $user->id);
-}
+$user->interests = core_tag_tag::get_item_tags_array('core', 'user', $user->id);
 
 // Remote users cannot be edited. We have to perform the strict
 // user_not_fully_set_up() check, otherwise the remote user could end up in
@@ -236,7 +233,7 @@ if ($usernew = $userform->get_data()) {
     useredit_update_user_preference($usernew);
 
     // Update interests.
-    if (!empty($CFG->usetags)) {
+    if (isset($usernew->interests)) {
         useredit_update_interests($usernew, $usernew->interests);
     }
 

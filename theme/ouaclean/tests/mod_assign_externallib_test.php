@@ -38,4 +38,15 @@ class theme_ouaclean_mod_assign_external_testcase extends mod_assign_external_te
 
         return parent::setUp();
     }
+
+    /**
+     * Theme changes require reset after test, this particular test is read only and does not reset.
+     */
+    public function test_list_participants_returns_user_property_types() {
+        $this->resetAfterTest(true);
+        return parent::test_list_participants_returns_user_property_types();
+    }
+
+
+
 }

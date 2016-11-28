@@ -912,7 +912,6 @@ COUNTDOWN;
         $viewobj->editurl = new moodle_url('/mod/quiz/edit.php', array('cmid' => $cm->id));
         $viewobj->backtocourseurl = new moodle_url('/course/view.php', array('id' => $course->id));
         $viewobj->startattempturl = $quizobj->start_attempt_url();
-        $viewobj->startattemptwarning = $quizobj->confirm_start_attempt_message($unfinished);
         $viewobj->popuprequired = $accessmanager->attempt_must_be_in_popup();
         $viewobj->popupoptions = $accessmanager->get_popup_options();
 

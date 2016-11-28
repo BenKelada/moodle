@@ -43,6 +43,7 @@ var AJAXBASE = M.cfg.wwwroot + '/mod/assign/feedback/editpdf/ajax.php',
         ANNOTATIONCOLOURBUTTON :  '.annotationcolourbutton',
         DELETEANNOTATIONBUTTON : '.deleteannotationbutton',
         UNSAVEDCHANGESDIV : '.assignfeedback_editpdf_unsavedchanges',
+        UNSAVEDCHANGESINPUT : 'input[name="assignfeedback_editpdf_haschanges"]',
         STAMPSBUTTON : '.currentstampbutton',
         DIALOGUE : '.' + CSS.DIALOGUE
     },
@@ -74,6 +75,7 @@ var AJAXBASE = M.cfg.wwwroot + '/mod/assign/feedback/editpdf/ajax.php',
         'oval': '.ovalbutton',
         'stamp': '.stampbutton',
         'select': '.selectbutton',
+        'drag': '.dragbutton',
         'highlight': '.highlightbutton'
     },
     STROKEWEIGHT = 4;
@@ -360,7 +362,7 @@ var EDIT = function() {
      * @type String
      * @public
      */
-    this.tool = "comment";
+    this.tool = "drag";
 
     /**
      * The currently comment colour
@@ -2628,43 +2630,50 @@ var COMMENT = function(editor, gradeid, pageno, x, y, width, colour, rawtext) {
         });
 
         node.on('gesturemovestart', function(e) {
-            node.setData('dragging', true);
-            node.setData('offsetx', e.clientX - node.getX());
-            node.setData('offsety', e.clientY - node.getY());
+            if (editor.currentedit.tool === 'select') {
+                e.preventDefault();
+                node.setData('dragging', true);
+                node.setData('offsetx', e.clientX - node.getX());
+                node.setData('offsety', e.clientY - node.getY());
+            }
         });
         node.on('gesturemoveend', function() {
-            node.setData('dragging', false);
-            this.editor.save_current_page();
+            if (editor.currentedit.tool === 'select') {
+                node.setData('dragging', false);
+                this.editor.save_current_page();
+            }
         }, null, this);
         node.on('gesturemove', function(e) {
-            var x = e.clientX - node.getData('offsetx'),
-                y = e.clientY - node.getData('offsety'),
-                nodewidth,
-                nodeheight,
-                newlocation,
-                windowlocation,
-                bounds;
+            if (editor.currentedit.tool === 'select') {
+                var x = e.clientX - node.getData('offsetx'),
+                    y = e.clientY - node.getData('offsety'),
+                    nodewidth,
+                    nodeheight,
+                    newlocation,
+                    windowlocation,
+                    bounds;
 
-            nodewidth = parseInt(node.getStyle('width'), 10);
-            nodeheight = parseInt(node.getStyle('height'), 10);
+                nodewidth = parseInt(node.getStyle('width'), 10);
+                nodeheight = parseInt(node.getStyle('height'), 10);
 
-            newlocation = this.editor.get_canvas_coordinates(new M.assignfeedback_editpdf.point(x, y));
-            bounds = this.editor.get_canvas_bounds(true);
-            bounds.x = 0;
-            bounds.y = 0;
+                newlocation = this.editor.get_canvas_coordinates(new M.assignfeedback_editpdf.point(x, y));
+                bounds = this.editor.get_canvas_bounds(true);
+                bounds.x = 0;
+                bounds.y = 0;
 
-            bounds.width -= nodewidth + 42;
-            bounds.height -= nodeheight + 8;
-            // Clip to the window size - the comment size.
-            newlocation.clip(bounds);
+                bounds.width -= nodewidth + 42;
+                bounds.height -= nodeheight + 8;
+                // Clip to the window size - the comment size.
+                newlocation.clip(bounds);
 
-            this.x = newlocation.x;
-            this.y = newlocation.y;
+                this.x = newlocation.x;
+                this.y = newlocation.y;
 
-            windowlocation = this.editor.get_window_coordinates(newlocation);
-            node.ancestor().setX(windowlocation.x);
-            node.ancestor().setY(windowlocation.y);
-            this.drawable.store_position(node.ancestor(), windowlocation.x, windowlocation.y);
+                windowlocation = this.editor.get_window_coordinates(newlocation);
+                node.ancestor().setX(windowlocation.x);
+                node.ancestor().setY(windowlocation.y);
+                this.drawable.store_position(node.ancestor(), windowlocation.x, windowlocation.y);
+            }
         }, null, this);
 
         this.menu = new M.assignfeedback_editpdf.commentmenu({
@@ -3116,6 +3125,15 @@ EDITOR.prototype = {
     dialogue : null,
 
     /**
+     * The panel used for all action menu displays.
+     *
+     * @property type
+     * @type Y.Node
+     * @protected
+     */
+    panel : null,
+
+    /**
      * The number of pages in the pdf.
      *
      * @property pagecount
@@ -3276,11 +3294,24 @@ EDITOR.prototype = {
             link.on('click', this.link_handler, this);
             link.on('key', this.link_handler, 'down:13', this);
 
-            this.currentedit.start = false;
-            this.currentedit.end = false;
-            if (!this.get('readonly')) {
-                this.quicklist = new M.assignfeedback_editpdf.quickcommentlist(this);
-            }
+            // We call the amd module to see if we can take control of the review panel.
+            require(['mod_assign/grading_review_panel'], function(ReviewPanelManager) {
+                var panelManager = new ReviewPanelManager();
+
+                var panel = panelManager.getReviewPanel('assignfeedback_editpdf');
+                if (panel) {
+                    panel = Y.one(panel);
+                    panel.empty();
+                    link.ancestor('.fitem').hide();
+                    this.open_in_panel(panel);
+                }
+                this.currentedit.start = false;
+                this.currentedit.end = false;
+                if (!this.get('readonly')) {
+                    this.quicklist = new M.assignfeedback_editpdf.quickcommentlist(this);
+                }
+            }.bind(this));
+
         }
     },
 
@@ -3289,7 +3320,7 @@ EDITOR.prototype = {
      * @method refresh_button_state
      */
     refresh_button_state : function() {
-        var button, currenttoolnode, imgurl;
+        var button, currenttoolnode, imgurl, drawingregion;
 
         // Initalise the colour buttons.
         button = this.get_dialogue_element(SELECTOR.COMMENTCOLOURBUTTON);
@@ -3310,6 +3341,8 @@ EDITOR.prototype = {
         currenttoolnode = this.get_dialogue_element(TOOLSELECTOR[this.currentedit.tool]);
         currenttoolnode.addClass('assignfeedback_editpdf_selectedbutton');
         currenttoolnode.setAttribute('aria-pressed', 'true');
+        drawingregion = this.get_dialogue_element(SELECTOR.DRAWINGREGION);
+        drawingregion.setAttribute('data-currenttool', this.currentedit.tool);
 
         button = this.get_dialogue_element(SELECTOR.STAMPSBUTTON);
         button.one('img').setAttrs({'src': this.get_stamp_image_url(this.currentedit.stamp),
@@ -3357,6 +3390,36 @@ EDITOR.prototype = {
             newpoint = new M.assignfeedback_editpdf.point(point.x + bounds.x, point.y + bounds.y);
 
         return newpoint;
+    },
+
+    /**
+     * Open the edit-pdf editor in the panel in the page instead of a popup.
+     * @method open_in_panel
+     */
+    open_in_panel : function(panel) {
+        var drawingcanvas, drawingregion;
+
+        this.panel = panel;
+        panel.append(this.get('body'));
+        panel.addClass(CSS.DIALOGUE);
+
+        this.loadingicon = this.get_dialogue_element(SELECTOR.LOADINGICON);
+
+        drawingcanvas = this.get_dialogue_element(SELECTOR.DRAWINGCANVAS);
+        this.graphic = new Y.Graphic({render : drawingcanvas});
+
+        drawingregion = this.get_dialogue_element(SELECTOR.DRAWINGREGION);
+        drawingregion.on('scroll', this.move_canvas, this);
+
+        if (!this.get('readonly')) {
+            drawingcanvas.on('gesturemovestart', this.edit_start, null, this);
+            drawingcanvas.on('gesturemove', this.edit_move, null, this);
+            drawingcanvas.on('gesturemoveend', this.edit_end, null, this);
+
+            this.refresh_button_state();
+        }
+
+        this.load_all_pages();
     },
 
     /**
@@ -3514,14 +3577,18 @@ EDITOR.prototype = {
         try {
             data = Y.JSON.parse(responsetext);
             if (data.error || !data.pagecount) {
-                this.dialogue.hide();
+                if (this.dialogue) {
+                    this.dialogue.hide();
+                }
                 // Display alert dialogue.
                 error = new M.core.alert({ message: M.util.get_string('cannotopenpdf', 'assignfeedback_editpdf') });
                 error.show();
                 return;
             }
         } catch (e) {
-            this.dialogue.hide();
+            if (this.dialogue) {
+                this.dialogue.hide();
+            }
             // Display alert dialogue.
             error = new M.core.alert({ title: M.util.get_string('cannotopenpdf', 'assignfeedback_editpdf')});
             error.show();
@@ -3689,7 +3756,8 @@ EDITOR.prototype = {
         currenttoolnode.removeClass('assignfeedback_editpdf_selectedbutton');
         currenttoolnode.setAttribute('aria-pressed', 'false');
         this.currentedit.tool = tool;
-        if (tool !== "comment" && tool !== "select" && tool !== "stamp") {
+
+        if (tool !== "comment" && tool !== "select" && tool !== "drag" && tool !== "stamp") {
             this.lastannotationtool = tool;
         }
         this.refresh_button_state();
@@ -3752,7 +3820,11 @@ EDITOR.prototype = {
      * @method get_dialogue_element
      */
     get_dialogue_element : function(selector) {
-        return this.dialogue.get('boundingBox').one(selector);
+        if (this.panel) {
+            return this.panel.one(selector);
+        } else {
+            return this.dialogue.get('boundingBox').one(selector);
+        }
     },
 
     /**
@@ -3847,9 +3919,12 @@ EDITOR.prototype = {
         e.preventDefault();
         var bounds = this.get_canvas_bounds(),
             canvas = this.get_dialogue_element(SELECTOR.DRAWINGCANVAS),
+            drawingregion = this.get_dialogue_element(SELECTOR.DRAWINGREGION),
             clientpoint = new M.assignfeedback_editpdf.point(e.clientX + canvas.get('docScrollX'),
                                                              e.clientY + canvas.get('docScrollY')),
-            point = this.get_canvas_coordinates(clientpoint);
+            point = this.get_canvas_coordinates(clientpoint),
+            diffX,
+            diffY;
 
         // Ignore events out of the canvas area.
         if (point.x < 0 || point.x > bounds.width || point.y < 0 || point.y > bounds.height) {
@@ -3865,6 +3940,13 @@ EDITOR.prototype = {
                 this.currentannotation.move( this.currentedit.annotationstart.x + point.x - this.currentedit.start.x,
                                              this.currentedit.annotationstart.y + point.y - this.currentedit.start.y);
             }
+        } else if (this.currentedit.tool === 'drag') {
+            diffX = point.x - this.currentedit.start.x;
+            diffY = point.y - this.currentedit.start.y;
+
+            drawingregion.getDOMNode().scrollLeft -= diffX;
+            drawingregion.getDOMNode().scrollTop -= diffY;
+
         } else {
             if (this.currentedit.start) {
                 this.currentedit.end = point;
@@ -3933,10 +4015,12 @@ EDITOR.prototype = {
     resize : function() {
         var drawingregion, drawregionheight;
 
-        if (!this.dialogue.get('visible')) {
-            return;
+        if (this.dialogue) {
+            if (!this.dialogue.get('visible')) {
+                return;
+            }
+            this.dialogue.centerDialogue();
         }
-        this.dialogue.centerDialogue();
 
         // Make sure the dialogue box is not bigger than the max height of the viewport.
         drawregionheight = Y.one('body').get('winHeight') - 120; // Space for toolbar + titlebar.
@@ -3944,7 +4028,9 @@ EDITOR.prototype = {
             drawregionheight = 100;
         }
         drawingregion = this.get_dialogue_element(SELECTOR.DRAWINGREGION);
-        drawingregion.setStyle('maxHeight', drawregionheight +'px');
+        if (this.dialogue) {
+            drawingregion.setStyle('maxHeight', drawregionheight +'px');
+        }
         this.redraw();
         return true;
     },
@@ -4003,8 +4089,16 @@ EDITOR.prototype = {
                         if (jsondata.error) {
                             return new M.core.ajaxException(jsondata);
                         }
-                        Y.one('#' + this.get('linkid')).siblings(SELECTOR.UNSAVEDCHANGESDIV)
-                            .item(0).addClass('haschanges');
+                        Y.one(SELECTOR.UNSAVEDCHANGESINPUT).set('value', 'true');
+                        Y.one(SELECTOR.UNSAVEDCHANGESDIV).setStyle('opacity', 1);
+                        Y.one(SELECTOR.UNSAVEDCHANGESDIV).setStyle('display', 'inline-block');
+                        Y.one(SELECTOR.UNSAVEDCHANGESDIV).transition({
+                            duration: 1,
+                            delay: 2,
+                            opacity: 0
+                        }, function() {
+                            Y.one(SELECTOR.UNSAVEDCHANGESDIV).setStyle('display', 'none');
+                        });
                     } catch (e) {
                         return new M.core.exception(e);
                     }
@@ -4108,6 +4202,7 @@ EDITOR.prototype = {
     setup_navigation : function() {
         var pageselect,
             i,
+            strinfo,
             option,
             previousbutton,
             nextbutton;
@@ -4119,7 +4214,8 @@ EDITOR.prototype = {
             for (i = 0; i < this.pages.length; i++) {
                 option = Y.Node.create('<option/>');
                 option.setAttribute('value', i);
-                option.setHTML(M.util.get_string('pagenumber', 'assignfeedback_editpdf', i+1));
+                strinfo = {page: i+1, total: this.pages.length};
+                option.setHTML(M.util.get_string('pagexofy', 'assignfeedback_editpdf', strinfo));
                 pageselect.append(option);
             }
         }
@@ -4245,7 +4341,8 @@ M.assignfeedback_editpdf.editor = M.assignfeedback_editpdf.editor || {};
  * @param {Object} params
  */
 M.assignfeedback_editpdf.editor.init = M.assignfeedback_editpdf.editor.init || function(params) {
-    return new EDITOR(params);
+    M.assignfeedback_editpdf.instance =  new EDITOR(params);
+    return M.assignfeedback_editpdf.instance;
 };
 
 
@@ -4259,6 +4356,7 @@ M.assignfeedback_editpdf.editor.init = M.assignfeedback_editpdf.editor.init || f
         "json",
         "event-move",
         "event-resize",
+        "transition",
         "querystring-stringify-simple",
         "moodle-core-notification-dialog",
         "moodle-core-notification-exception",

@@ -232,36 +232,38 @@ class theme_ouaclean_mod_quiz_renderer extends mod_quiz_renderer {
      * @param string               $buttontext
      */
     public function start_attempt_button($buttontext, moodle_url $url,
-        $startattemptwarning, $popuprequired, $popupoptions) {
+                                         mod_quiz_preflight_check_form $preflightcheckform = null,
+                                         $popuprequired = false, $popupoptions = null) {
 
-        $button = new single_button($url, $buttontext);
-        $button->class .= ' quizstartbuttondiv submissionaction';
-        $button->buttonclass = ' primary_btn rightarrow';
-        $warning = '';
-        if ($popuprequired) {
-            $this->page->requires->js_module(quiz_get_js_module());
-            $this->page->requires->js('/mod/quiz/module.js');
-            $popupaction = new popup_action('click', $url, 'quizpopup', $popupoptions);
-
-            $button->class .= ' quizsecuremoderequired';
-            $button->add_action(new component_action('click',
-                'M.mod_quiz.secure_window.start_attempt_action', array(
-                    'url'                 => $url->out(false),
-                    'windowname'          => 'quizpopup',
-                    'options'             => $popupaction->get_js_options(),
-                    'fullscreen'          => true,
-                    'startattemptwarning' => $startattemptwarning,
-                )));
-
-            $warning = html_writer::tag('noscript', $this->heading(get_string('noscript', 'quiz')));
-        } else if ($startattemptwarning) {
-            $button->add_action(new confirm_action($startattemptwarning, null,
-                get_string('startattempt', 'quiz')));
+        if (is_string($preflightcheckform)) {
+            // Calling code was not updated since the API change.
+            debugging('The third argument to start_attempt_button should now be the ' .
+                    'mod_quiz_preflight_check_form from ' .
+                    'quiz_access_manager::get_preflight_check_form, not a warning message string.');
         }
 
-        return $this->render($button) . $warning;
-    }
+        $button = new single_button($url, $buttontext);
+        $button->class .= ' quizstartbuttondiv submissionaction ';
+        $button->buttonclass = ' primary_btn rightarrow';
 
+        $popupjsoptions = null;
+        if ($popuprequired && $popupoptions) {
+            $action = new popup_action('click', $url, 'popup', $popupoptions);
+            $popupjsoptions = $action->get_js_options();
+        }
+
+        if ($preflightcheckform) {
+            $checkform = $preflightcheckform->render();
+        } else {
+            $checkform = null;
+        }
+
+        $this->page->requires->js_call_amd('mod_quiz/preflightcheck', 'init',
+                array('.quizstartbuttondiv input[type=submit]', get_string('startattempt', 'quiz'),
+                       '#mod_quiz_preflight_form', $popupjsoptions));
+
+        return $this->render($button) . $checkform;
+    }
     /**
      * Generates data pertaining to quiz results
      *

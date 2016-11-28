@@ -410,11 +410,10 @@ WHERE
  *
  * @param int $postid The ID of the forum post we are notifying the user about
  * @param int $usertoid The ID of the user being notified
- * @param string $hostname The server's hostname
  * @return string A unique message-id
  */
-function forum_get_email_message_id($postid, $usertoid, $hostname) {
-    return '<'.hash('sha256',$postid.'to'.$usertoid).'@'.$hostname.'>';
+function forum_get_email_message_id($postid, $usertoid) {
+    return generate_email_messageid(hash('sha256', $postid . 'to' . $usertoid));
 }
 
 /**
@@ -596,9 +595,6 @@ function forum_cron() {
 
     if ($users && $posts) {
 
-        $urlinfo = parse_url($CFG->wwwroot);
-        $hostname = $urlinfo['host'];
-
         foreach ($users as $userto) {
             // Terminate if processing of any account takes longer than 2 minutes.
             core_php_time_limit::raise(120);
@@ -751,9 +747,9 @@ function forum_cron() {
 
                 $userfrom->customheaders = array (
                     // Headers to make emails easier to track.
-                    'List-Id: "'        . $cleanforumname . '" <moodleforum' . $forum->id . '@' . $hostname.'>',
+                    'List-Id: "'        . $cleanforumname . '" ' . generate_email_messageid('moodleforum' . $forum->id),
                     'List-Help: '       . $CFG->wwwroot . '/mod/forum/view.php?f=' . $forum->id,
-                    'Message-ID: '      . forum_get_email_message_id($post->id, $userto->id, $hostname),
+                    'Message-ID: '      . forum_get_email_message_id($post->id, $userto->id),
                     'X-Course-Id: '     . $course->id,
                     'X-Course-Name: '   . format_string($course->fullname, true),
 
@@ -789,23 +785,32 @@ function forum_cron() {
                         $canreply
                     );
 
+                $userfrom->customheaders[] = sprintf('List-Unsubscribe: <%s>',
+                    $data->get_unsubscribediscussionlink());
+
                 if (!isset($userto->viewfullnames[$forum->id])) {
                     $data->viewfullnames = has_capability('moodle/site:viewfullnames', $modcontext, $userto->id);
                 } else {
                     $data->viewfullnames = $userto->viewfullnames[$forum->id];
                 }
 
+                // Not all of these variables are used in the default language
+                // string but are made available to support custom subjects.
                 $a = new stdClass();
-                $a->courseshortname = $data->get_coursename();
-                $a->forumname = $cleanforumname;
                 $a->subject = $data->get_subject();
+                $a->forumname = $cleanforumname;
+                $a->sitefullname = format_string($site->fullname);
+                $a->siteshortname = format_string($site->shortname);
+                $a->courseidnumber = $data->get_courseidnumber();
+                $a->coursefullname = $data->get_coursefullname();
+                $a->courseshortname = $data->get_coursename();
                 $postsubject = html_to_text(get_string('postmailsubject', 'forum', $a), 0);
 
-                $rootid = forum_get_email_message_id($discussion->firstpost, $userto->id, $hostname);
+                $rootid = forum_get_email_message_id($discussion->firstpost, $userto->id);
 
                 if ($post->parent) {
                     // This post is a reply, so add reply header (RFC 2822).
-                    $parentid = forum_get_email_message_id($post->parent, $userto->id, $hostname);
+                    $parentid = forum_get_email_message_id($post->parent, $userto->id);
                     $userfrom->customheaders[] = "In-Reply-To: $parentid";
 
                     // If the post is deeply nested we also reference the parent message id and
@@ -1022,13 +1027,8 @@ function forum_cron() {
                 $posttext = get_string('digestmailheader', 'forum', $headerdata)."\n\n";
                 $headerdata->userprefs = '<a target="_blank" href="'.$headerdata->userprefs.'">'.get_string('digestmailprefs', 'forum').'</a>';
 
-                $posthtml = "<head>";
-/*                foreach ($CFG->stylesheets as $stylesheet) {
-                    //TODO: MDL-21120
-                    $posthtml .= '<link rel="stylesheet" type="text/css" href="'.$stylesheet.'" />'."\n";
-                }*/
-                $posthtml .= "</head>\n<body id=\"email\">\n";
-                $posthtml .= '<p>'.get_string('digestmailheader', 'forum', $headerdata).'</p><br /><hr size="1" noshade="noshade" />';
+                $posthtml = '<p>'.get_string('digestmailheader', 'forum', $headerdata).'</p>'
+                    . '<br /><hr size="1" noshade="noshade" />';
 
                 foreach ($thesediscussions as $discussionid) {
 
@@ -1081,6 +1081,7 @@ function forum_cron() {
 
                     $postsarray = $discussionposts[$discussionid];
                     sort($postsarray);
+                    $sentcount = 0;
 
                     foreach ($postsarray as $postid) {
                         $post = $posts[$postid];
@@ -1162,6 +1163,7 @@ function forum_cron() {
                                 $userto->markposts[$post->id] = $post->id;
                             }
                         }
+                        $sentcount++;
                     }
                     $footerlinks = array();
                     if ($canunsubscribe) {
@@ -1173,17 +1175,24 @@ function forum_cron() {
                     $posthtml .= "\n<div class='mdl-right'><font size=\"1\">" . implode('&nbsp;', $footerlinks) . '</font></div>';
                     $posthtml .= '<hr size="1" noshade="noshade" /></p>';
                 }
-                $posthtml .= '</body>';
 
                 if (empty($userto->mailformat) || $userto->mailformat != 1) {
                     // This user DOESN'T want to receive HTML
                     $posthtml = '';
                 }
 
-                $attachment = $attachname='';
-                // Directly email forum digests rather than sending them via messaging, use the
-                // site shortname as 'from name', the noreply address will be used by email_to_user.
-                $mailresult = email_to_user($userto, $site->shortname, $postsubject, $posttext, $posthtml, $attachment, $attachname);
+                $eventdata = new \core\message\message();
+                $eventdata->component           = 'mod_forum';
+                $eventdata->name                = 'digests';
+                $eventdata->userfrom            = core_user::get_noreply_user();
+                $eventdata->userto              = $userto;
+                $eventdata->subject             = $postsubject;
+                $eventdata->fullmessage         = $posttext;
+                $eventdata->fullmessageformat   = FORMAT_PLAIN;
+                $eventdata->fullmessagehtml     = $posthtml;
+                $eventdata->notification        = 1;
+                $eventdata->smallmessage        = get_string('smallmessagedigest', 'forum', $sentcount);
+                $mailresult = message_send($eventdata);
 
                 if (!$mailresult) {
                     mtrace("ERROR: mod/forum/cron.php: Could not send out digest mail to user $userto->id ".
@@ -1814,8 +1823,6 @@ function forum_get_all_discussion_posts($discussionid, $sort, $tracking=false) {
     $params = array();
 
     if ($tracking) {
-        $now = time();
-        $cutoffdate = $now - ($CFG->forum_oldpostdays * 24 * 3600);
         $tr_sel  = ", fr.id AS postread";
         $tr_join = "LEFT JOIN {forum_read} fr ON (fr.postid = p.id AND fr.userid = ?)";
         $params[] = $USER->id;
@@ -2704,9 +2711,10 @@ function forum_get_discussion_neighbours($cm, $discussion, $forum) {
     $params['discid4'] = $discussion->id;
     $params['disctimecompare1'] = $discussion->timemodified;
     $params['disctimecompare2'] = $discussion->timemodified;
-    $params['pinnedstate1'] = $discussion->pinned;
-    $params['pinnedstate2'] = $discussion->pinned;
-    $params['pinnedstate3'] = $discussion->pinned;
+    $params['pinnedstate1'] = (int) $discussion->pinned;
+    $params['pinnedstate2'] = (int) $discussion->pinned;
+    $params['pinnedstate3'] = (int) $discussion->pinned;
+    $params['pinnedstate4'] = (int) $discussion->pinned;
 
     $sql = "SELECT d.id, d.name, d.timemodified, d.groupid, d.timestart, d.timeend
               FROM {forum_discussions} d
@@ -2760,14 +2768,14 @@ function forum_get_discussion_neighbours($cm, $discussion, $forum) {
          $orderbyasc = "d.pinned, p.created ASC";
     }
 
-    $prevsql = $sql . " AND ( (($comparefield < $comparevalue) AND :pinnedstate1::integer = d.pinned)
-                         OR ($comparefield = $comparevalue2 AND d.id < :discid2)
+    $prevsql = $sql . " AND ( (($comparefield < $comparevalue) AND :pinnedstate1 = d.pinned)
+                         OR ($comparefield = $comparevalue2 AND (d.pinned = 0 OR d.pinned = :pinnedstate4) AND d.id < :discid2)
                          OR (d.pinned = 0 AND d.pinned <> :pinnedstate2))
                    ORDER BY CASE WHEN d.pinned = :pinnedstate3 THEN 1 ELSE 0 END DESC, $orderbydesc, d.id DESC";
 
-    $nextsql = $sql . " AND ( (($comparefield > $comparevalue) AND :pinnedstate1::integer = d.pinned)
-                         OR ($comparefield = $comparevalue2 AND d.id > :discid2)
-                         OR (d.pinned =1 AND d.pinned <> :pinnedstate2))
+    $nextsql = $sql . " AND ( (($comparefield > $comparevalue) AND :pinnedstate1 = d.pinned)
+                         OR ($comparefield = $comparevalue2 AND (d.pinned = 1 OR d.pinned = :pinnedstate4) AND d.id > :discid2)
+                         OR (d.pinned = 1 AND d.pinned <> :pinnedstate2))
                    ORDER BY CASE WHEN d.pinned = :pinnedstate3 THEN 1 ELSE 0 END DESC, $orderbyasc, d.id ASC";
 
     $neighbours['prev'] = $DB->get_record_sql($prevsql, $params, IGNORE_MULTIPLE);
@@ -2925,8 +2933,6 @@ function forum_get_discussions_count($cm) {
         $groupselect = "";
     }
 
-    $cutoffdate = $now - ($CFG->forum_oldpostdays*24*60*60);
-
     $timelimit = "";
 
     if (!empty($CFG->forum_enabletimedposts)) {
@@ -3072,6 +3078,12 @@ function forum_print_post($post, $discussion, $forum, &$cm, $course, $ownpost=fa
 
     // String cache
     static $str;
+    // This is an extremely hacky way to ensure we only print the 'unread' anchor
+    // the first time we encounter an unread post on a page. Ideally this would
+    // be moved into the caller somehow, and be better testable. But at the time
+    // of dealing with this bug, this static workaround was the most surgical and
+    // it fits together with only printing th unread anchor id once on a given page.
+    static $firstunreadanchorprinted = false;
 
     $modcontext = context_module::instance($cm->id);
 
@@ -3197,6 +3209,11 @@ function forum_print_post($post, $discussion, $forum, &$cm, $course, $ownpost=fa
     // Prepare an array of commands
     $commands = array();
 
+    // Add a permalink.
+    $permalink = new moodle_url($discussionlink);
+    $permalink->set_anchor('p' . $post->id);
+    $commands[] = array('url' => $permalink, 'text' => get_string('permalink', 'forum'));
+
     // SPECIAL CASE: The front page can display a news item post to non-logged in users.
     // Don't display the mark read / unread controls in this case.
     if ($istracked && $CFG->forum_usermarksread && isloggedin()) {
@@ -3282,7 +3299,11 @@ function forum_print_post($post, $discussion, $forum, &$cm, $course, $ownpost=fa
             $forumpostclass = ' read';
         } else {
             $forumpostclass = ' unread';
-            $output .= html_writer::tag('a', '', array('name'=>'unread'));
+            // If this is the first unread post printed then give it an anchor and id of unread.
+            if (!$firstunreadanchorprinted) {
+                $output .= html_writer::tag('a', '', array('id' => 'unread'));
+                $firstunreadanchorprinted = true;
+            }
         }
     } else {
         // ignore trackign status if not tracked or tracked param missing
@@ -3670,7 +3691,7 @@ function forum_print_discussion_header(&$post, $forum, $group = -1, $datestring 
     }
     echo '<td class="'.$topicclass.'">';
     if (FORUM_DISCUSSION_PINNED == $post->pinned) {
-        echo $OUTPUT->pix_icon('t/pinned', get_string('discussionpinned', 'forum'), 'mod_forum');
+        echo $OUTPUT->pix_icon('i/pinned', get_string('discussionpinned', 'forum'), 'mod_forum');
     }
     $canalwaysseetimedpost = $USER->id == $post->userid || $canviewhiddentimedposts;
     if ($timeddiscussion && $canalwaysseetimedpost) {
@@ -4381,7 +4402,10 @@ function forum_update_post($post, $mform, $unused = null) {
         $discussion->name      = $post->subject;
         $discussion->timestart = $post->timestart;
         $discussion->timeend   = $post->timeend;
-        $discussion->pinned    = $post->pinned;
+
+        if (isset($post->pinned)) {
+            $discussion->pinned = $post->pinned;
+        }
     }
     $post->message = file_save_draft_area_files($post->itemid, $context->id, 'mod_forum', 'post', $post->id,
             mod_forum_post_form::editor_options($context, $post->id), $post->message);
