@@ -30,13 +30,6 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/assign/tests/locallib_test.php');
 require_once($CFG->dirroot . '/local/oua_utility/oua_advanced_testcase.php');
 
-/**
- * Class theme_ouaclean_mod_assign_locallib_validator
- * Extend abstract class so we can use our custom validation methods, when we are already extending assignment testcase.
- */
-class theme_ouaclean_mod_assign_locallib_validator extends oua_advanced_testcase {
-
-}
 
 /**
  * Unit tests for (some of) mod/assign/locallib.php.
@@ -123,7 +116,7 @@ class theme_ouaclean_mod_assign_locallib_testcase extends mod_assign_locallib_te
         // Should have feedback but no grade.
         $this->setUser($this->students[0]);
         $output = $assign->view_student_summary($this->students[0], true);
-        $ouatest = new theme_ouaclean_mod_assign_locallib_validator();
+        $ouatest = new oua_advanced_testcase();
         $ouatest->assertValidHtml($output);
         $this->assertNotEquals(false, strpos($output, get_string('tutor_response', 'theme_ouaclean')), 'Show feedback even if there is no grade');
         $this->assertEquals(false, strpos($output, 'Grade'), 'Do not show grade when there is no grade.');

@@ -7,42 +7,7 @@ use \theme_ouaclean\output\awesomebar\renderable as awesomebar_renderable;
  */
 class theme_ouaclean_mod_assign_renderer extends mod_assign_renderer {
     protected $headerobj;
-    public $feedbackstatusrenderable;
     public $usedefaultrender = false;
-
-    /**
-     * Custom Renderer the submission page, pull out feedback status so we can display it inside
-     * submission status renderable
-     *
-     * @param $page
-     *
-     * @return bool|string
-     * @throws moodle_exception
-     */
-    public function render_assign_submission_page($page) {
-        global $PAGE;
-        // Use the default renderer for report page.
-        if (strpos($PAGE->url->get_path(), '/mod/assign/') === false) {
-            return parent::render_assign_submission_page($page);
-        }
-        $data = $page->export_for_template($this);
-        $submissionstatus = null;
-        $this->feedbackstatusrenderable = null;
-        foreach ($data->renderables as $name => $renderable) {
-            if ($name == 'feedback_status') { // We will pull the renderable out and render it inside submission status
-                $this->feedbackstatusrenderable = $renderable;
-            } else if ($name == 'submission_status') { // Render submission status last as we want to render feedback_status inside it
-                $submissionstatus = $renderable;
-            } else {
-                $data->$name = $this->render($renderable);
-            }
-        }
-        if ($submissionstatus !== null) {
-            $data->submission_status = $this->render($submissionstatus);
-        }
-
-        return $this->render_from_template('mod_assign/submission_page', $data);
-    }
 
     /**
      * Render the header, store the header for alter use as it contains the assignment description
@@ -102,8 +67,8 @@ class theme_ouaclean_mod_assign_renderer extends mod_assign_renderer {
             $this->usedefaultrender = true;
             $o = '';
             $o .= parent::render_assign_submission_status($status);
-            if ($this->feedbackstatusrenderable) {
-                $o .= $this->render($this->feedbackstatusrenderable);
+            if ($status->feedbackstatusrenderable) {
+                $o .= $this->render($status->feedbackstatusrenderable);
             }
 
             return $o;
@@ -236,8 +201,8 @@ class theme_ouaclean_mod_assign_renderer extends mod_assign_renderer {
                 $stateclasses .= ' submissiongraded';
                 $box3header = get_string('grade');
                 $box3headershort = get_string('grade');
-                if ($this->feedbackstatusrenderable) {
-                    $box3content = $this->feedbackstatusrenderable->gradefordisplay;
+                if ($status->feedbackstatusrenderable) {
+                    $box3content = $status->feedbackstatusrenderable->gradefordisplay;
                 } else {
                     //grade hidden
                     get_string('assess:errorgettinggrade', 'theme_ouaclean');
@@ -287,8 +252,8 @@ class theme_ouaclean_mod_assign_renderer extends mod_assign_renderer {
         }
 
         $feedbackcontent = '';
-        if ($this->feedbackstatusrenderable) { // generate feedbackstatus to display inside the Awesomebar.
-            $feedbackcontent = $this->render($this->feedbackstatusrenderable);
+        if ($status->feedbackstatusrenderable) { // generate feedbackstatusrenderable to display inside the Awesomebar.
+            $feedbackcontent = $this->render($status->feedbackstatusrenderable);
         }
         $awesomebar = new awesomebar_renderable($stateclasses, $box1header, $box1headershort, $box1content, $box2header, $box2headershort, $box2content, $box3header, $box3headershort, $box3content, $feedbackcontent);
         $awesomebarrenderer = $this->page->get_renderer('theme_ouaclean', 'awesomebar');

@@ -56,7 +56,7 @@ class theme_ouaclean_mod_assign_events_testcase extends assign_events_testcase {
         } catch (Exception $e) {
             // Confirm the exception happens where we expect, if not investigate what's changed about the parent test case.
             $this->assertEquals('Trying to get property of non-object', $e->getMessage());
-            $this->assertEquals(824, $e->getLine());
+            $this->assertEquals(789, $e->getLine());
             $this->assertStringEndsWith('theme/ouaclean/classes/mod_assign_renderer.php', $e->getFile());
             return;
         }

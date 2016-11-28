@@ -5,8 +5,12 @@
  *
  * Add XML and HTML validation capabilities to moodle test cases.
  */
-abstract class oua_advanced_testcase extends advanced_testcase {
-
+class oua_advanced_testcase extends advanced_testcase {
+    public function test_dummy_test()
+    {
+        $this->resetAfterTest(true);
+        return;
+    }
     private $HTML401NamedToNumeric = array( // Translation table to translate named html entities to numeric for XML parsing.
                                             '&nbsp;'     => '&#160;',  # no-break space = non-breaking space, U+00A0 ISOnum
                                             '&iexcl;'    => '&#161;',  # inverted exclamation mark, U+00A1 ISOnum

@@ -4385,7 +4385,7 @@ class assign {
      * @param bool $showlinks return plain text or links to the profile
      * @return assign_submission_status renderable object
      */
-    public function get_assign_submission_status_renderable($user, $showlinks) {
+    public function get_assign_submission_status_renderable($user, $showlinks, $feedbackstatusrenderable = null) {
         global $PAGE;
 
         $instance = $this->get_instance();
@@ -4433,35 +4433,36 @@ class assign {
         $gradingstatus = $this->get_grading_status($user->id);
         $usergroups = $this->get_all_groups($user->id);
         $submissionstatus = new assign_submission_status($instance->allowsubmissionsfromdate,
-                                                          $instance->alwaysshowdescription,
-                                                          $submission,
-                                                          $instance->teamsubmission,
-                                                          $teamsubmission,
-                                                          $submissiongroup,
-                                                          $notsubmitted,
-                                                          $this->is_any_submission_plugin_enabled(),
-                                                          $gradelocked,
-                                                          $this->is_graded($user->id),
-                                                          $instance->duedate,
-                                                          $instance->cutoffdate,
-                                                          $this->get_submission_plugins(),
-                                                          $this->get_return_action(),
-                                                          $this->get_return_params(),
-                                                          $this->get_course_module()->id,
-                                                          $this->get_course()->id,
-                                                          assign_submission_status::STUDENT_VIEW,
-                                                          $showedit,
-                                                          $showsubmit,
-                                                          $viewfullnames,
-                                                          $extensionduedate,
-                                                          $this->get_context(),
-                                                          $this->is_blind_marking(),
-                                                          $gradingcontrollerpreview,
-                                                          $instance->attemptreopenmethod,
-                                                          $instance->maxattempts,
-                                                          $gradingstatus,
-                                                          $instance->preventsubmissionnotingroup,
-                                                          $usergroups);
+                                                         $instance->alwaysshowdescription,
+                                                         $submission,
+                                                         $instance->teamsubmission,
+                                                         $teamsubmission,
+                                                         $submissiongroup,
+                                                         $notsubmitted,
+                                                         $this->is_any_submission_plugin_enabled(),
+                                                         $gradelocked,
+                                                         $this->is_graded($user->id),
+                                                         $instance->duedate,
+                                                         $instance->cutoffdate,
+                                                         $this->get_submission_plugins(),
+                                                         $this->get_return_action(),
+                                                         $this->get_return_params(),
+                                                         $this->get_course_module()->id,
+                                                         $this->get_course()->id,
+                                                         assign_submission_status::STUDENT_VIEW,
+                                                         $showedit,
+                                                         $showsubmit,
+                                                         $viewfullnames,
+                                                         $extensionduedate,
+                                                         $this->get_context(),
+                                                         $this->is_blind_marking(),
+                                                         $gradingcontrollerpreview,
+                                                         $instance->attemptreopenmethod,
+                                                         $instance->maxattempts,
+                                                         $gradingstatus,
+                                                         $instance->preventsubmissionnotingroup,
+                                                         $usergroups,
+                                                         $feedbackstatusrenderable);
         return $submissionstatus;
     }
 
@@ -4590,6 +4591,30 @@ class assign {
         $o = '';
 
         if ($this->can_view_submission($user->id)) {
+
+
+            /* OUA CUSTOM: custom output for assignment status if using oua theme*/
+            $renderer = $this->get_renderer();
+
+            if($renderer instanceof theme_ouaclean_mod_assign_renderer) {
+                $feedbackstatus = $this->get_assign_feedback_status_renderable($user);
+
+                if (has_capability('mod/assign:submit', $this->get_context(), $user, false)) {
+                    $submissionstatus = $this->get_assign_submission_status_renderable($user, $showlinks, $feedbackstatus);
+                    $o .= $this->get_renderer()->render($submissionstatus);
+                } else {
+                    if ($feedbackstatus) {
+                        $o .= $this->get_renderer()->render($feedbackstatus);
+                    }
+                }
+                // If there is more than one submission, show the history.
+                $history = $this->get_assign_attempt_history_renderable($user);
+                if (count($history->submissions) > 1) {
+                    $o .= $this->get_renderer()->render($history);
+                }
+                return $o;
+            }
+            /* END OUA CUSTOM */
 
             if (has_capability('mod/assign:submit', $this->get_context(), $user, false)) {
                 $submissionstatus = $this->get_assign_submission_status_renderable($user, $showlinks);
